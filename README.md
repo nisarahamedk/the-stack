@@ -71,10 +71,20 @@ The linter is the rulebook; this section only records the choices no linter make
   - **React Compiler** on; agents don't hand-write `useMemo`/`useCallback`.
   - **`eslint-plugin-react-hooks`** `recommended` preset.
   - When react-doctor flags something that doesn't apply (e.g. an SSR-only rule on a client-only route), disable that rule in config with a comment saying why — don't work around it in code.
-- **Rendering:**
-  - **Signed-in app routes: client-only** (`ssr: false` on the app's root route, via TanStack Start selective SSR). Loaders run in the browser only; no hydration mismatches, no "where does this run?" questions; same mental model as Expo.
+- **Rendering and gating — decide on the server, draw in the browser:**
+  - **Signed-in app routes: `ssr: 'data-only'`** on the gated pathless layout routes (TanStack Start selective SSR). On the first request the Worker runs the gate (`beforeLoad`) and critical loaders; React components render only in the browser, so no hydration mismatches and no server-rendered component code. Later navigations run the same gate in the browser using cached state.
+  - **Why not `ssr: false`:** a client-only app draws the URL's route before it knows the session or account state, then corrects itself — the redirect/flash bug. Waiting on the client fixes it only while every component obeys the rule, costs 4–5 sequential round trips, and needs auth JS loaded first. A server gate redirects with HTTP before any JS downloads, so a wrong first screen can't be drawn regardless of client code.
   - **Marketing / public pages: prerendered at build time.**
-  - **Full SSR only by exception**, per route, for public pages with dynamic content that must be indexed. Note the reason in the route file.
+  - **Full SSR (`ssr: true`) only by exception**, per route, for public pages with dynamic content that must be indexed. Note the reason in the route file.
+- **Auth and lifecycle gating rules:**
+  - **One source of truth:** a single `viewer.state` procedure returns the user's lifecycle state (`anonymous` → `needs_setup` → `active` → …). No cookies or local storage remembering state.
+  - **One gate:** a function on the pathless layout routes maps state → allowed route groups (`(public)`, `(auth)`, `(setup)`, `(app)`) and throws `redirect()` otherwise. Components and layouts never redirect. New lifecycle state or route group → update the gate.
+  - **Never draw a guess:** while state is unknown, show a neutral pending screen — never the sign-in page or the app layout.
+  - **Keep it fresh:** mutations that change lifecycle state invalidate `viewer.state`; refetch it on window focus so changes on other devices are picked up.
+  - **Not the security boundary:** the API still authorizes every call. The gate only decides which screen to draw.
+  - **Mobile:** Expo keeps the splash screen up until `viewer.state` answers, then routes.
+  - **Tests:** one Playwright test per state × route group, loading the page fresh and asserting the *first* rendered screen.
+  - **Verify per project (unproven):** a redirect thrown from a `data-only` gate on the first request becomes an HTTP redirect before any HTML, and the auth provider's server-side session check (e.g. Clerk) works inside the gate.
 - **Data:** TanStack Router loaders + TanStack Query (`queryOptions` shared by loader and component) for reads; `createServerFn` with a Zod validator and an auth check for privileged reads and all writes; `useMutation` + query invalidation after writes. URL state lives in validated search params.
 - **Forms:** TanStack Form with the same Zod schema as the server function.
 - **Live data:** TanStack Query plus Durable Object / Cloudflare Agents SDK WebSocket pushes that invalidate or update queries. TanStack DB once it reaches 1.0.
