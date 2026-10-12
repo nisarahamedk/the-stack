@@ -24,7 +24,7 @@ Last verified: 2026-10-12. Items marked **(unproven)** have not been exercised e
 | Repo | Monorepo: pnpm workspaces + Turborepo | `apps/web`, `apps/api`, `apps/mobile`, `packages/*` |
 | Language | TypeScript everywhere, Zod 4 at boundaries | Effect TS: not default yet — see §3.1 |
 | Web | TanStack Start | See §3.1 for rendering, data and guardrails |
-| API | Hono on Cloudflare Workers | One API for web + mobile; authorization lives here (no RLS) |
+| API | oRPC (contract-first) served by Hono on Cloudflare Workers — **pin the version** | One typed API for every client (web, mobile, partners); typed RPC at `/rpc`, OpenAPI REST at `/api/v1`. Authorization lives here (no RLS). See §3.2 |
 | Mobile | Expo (EAS Build / Update / Workflows) | No secrets in the app bundle — publishable keys only |
 | Hosting | Cloudflare Workers | AWS / Hetzner / Fly when needed (Alchemy supports them); Vercel projects use Vercel's own previews |
 | IaC | Alchemy v2 — **pin the exact version** (beta) | Stages per PR + prod; custom resources for SaaS without a provider |
@@ -50,12 +50,14 @@ Last verified: 2026-10-12. Items marked **(unproven)** have not been exercised e
 
 ```
 apps/
-  web/            TanStack Start
-  api/            Hono Worker
-  mobile/         Expo app
+  web/            TanStack Start: marketing (prerendered) + app (gated, data-only)
+                  day one: also hosts the oRPC handler (/rpc, /api/v1) and webhooks
+  api/            (later) Hono Worker hosting the oRPC handler, split out when a 2nd client arrives
+  mobile/         (later) Expo app
 packages/
+  contract/       oRPC contract: procedures + Zod schemas + typed errors — the ONLY backend package clients import
+  core/           business logic: plain functions, no HTTP, no React (db/providers passed in)
   db/             Drizzle schema + migrations
-  shared/         types, validation (zod), API client
 alchemy.run.ts    all infrastructure, per stage
 secrets.json      vault names this project uses (no values)
 .env.example      non-secret config keys
@@ -85,10 +87,22 @@ The linter is the rulebook; this section only records the choices no linter make
   - **Mobile:** Expo keeps the splash screen up until `viewer.state` answers, then routes.
   - **Tests:** one Playwright test per state × route group, loading the page fresh and asserting the *first* rendered screen.
   - **Verify per project (unproven):** a redirect thrown from a `data-only` gate on the first request becomes an HTTP redirect before any HTML, and the auth provider's server-side session check (e.g. Clerk) works inside the gate.
-- **Data:** TanStack Router loaders + TanStack Query (`queryOptions` shared by loader and component) for reads; `createServerFn` with a Zod validator and an auth check for privileged reads and all writes; `useMutation` + query invalidation after writes. URL state lives in validated search params.
-- **Forms:** TanStack Form with the same Zod schema as the server function.
+- **Data:** all app data goes through the oRPC contract (§3.2) via `@orpc/tanstack-query`: loaders `ensureQueryData(orpc.x.queryOptions(...))`, components `useSuspenseQuery`, writes `useMutation` + invalidation. Gate and critical loaders call the same procedures on the server for the first load. No `createServerFn` for app data — only web-only chores (e.g. session cookies). URL state lives in validated search params.
+- **Forms:** TanStack Form with the same Zod schema as the contract procedure.
 - **Live data:** TanStack Query plus Durable Object / Cloudflare Agents SDK WebSocket pushes that invalidate or update queries. TanStack DB once it reaches 1.0.
 - **Effect TS — not the default (decision open):** Effect 4 shipped 2026-10-01; models mostly know v3, and RPC/HTTP/SQL/atoms are in `effect/unstable/*`. Next new project trials it on the backend only (Effect 4 pinned, Effect repo vendored for agents, Effect kept behind Promise boundaries so web/mobile stay plain TypeScript). Decide after the trial; revisit full-stack Effect when RPC/atoms are stable.
+
+### 3.2 API boundary — built for more clients later
+
+Every app starts as landing page + web app; mobile, partners, CLIs and agents come later. The boundary is the **contract**, not the deployment.
+
+- **oRPC, contract-first.** `packages/contract` defines every procedure (input/output Zod schemas, typed errors). Clients import only the contract, never server code. The same router serves typed RPC (`/rpc`) for first-party TypeScript clients and OpenAPI REST (`/api/v1`, spec generated) for everything else.
+- **Day one: one Worker.** The web app's Worker hosts the oRPC handler plus plain Hono/server routes for webhooks. When a second client arrives, move the handler to `apps/api` — contract and clients don't change.
+- **Thin handlers.** A handler does auth, validation (from the contract) and calls `packages/core`. All business logic lives in `core`; never in components, routes or handlers.
+- **One API for all clients.** Web gets no private shortcuts mobile lacks (no server functions for app data).
+- **Contract changes are additive** (new fields/procedures; no renames or removals without a deprecation window) — shipped mobile apps lag behind deploys, same discipline as DB migrations.
+- **Agents:** point them at `https://orpc.dev/llms.txt`; pin the oRPC version and upgrade deliberately (Renovate).
+- **Why oRPC over tRPC:** contract-first (clients decoupled from server code) and OpenAPI built in. **Risk:** single maintainer (verified 2026-10-12: 1.x since 2025, ~1.8M weekly downloads). **Exit plan:** the contract is plain Zod and logic lives in `core`, so if oRPC is abandoned, serve the same contract with Hono OpenAPI routes and generate clients from the spec; only handler glue changes.
 
 ## 4. Secrets and config
 
