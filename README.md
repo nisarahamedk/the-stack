@@ -22,8 +22,8 @@ Last verified: 2026-10-12. Items marked **(unproven)** have not been exercised e
 | Concern | Default | Notes |
 |---|---|---|
 | Repo | Monorepo: pnpm workspaces + Turborepo | `apps/web`, `apps/api`, `apps/mobile`, `packages/*` |
-| Language | TypeScript everywhere | |
-| Web | TanStack Start | |
+| Language | TypeScript everywhere, Zod 4 at boundaries | Effect TS: not default yet — see §3.1 |
+| Web | TanStack Start | See §3.1 for rendering, data and guardrails |
 | API | Hono on Cloudflare Workers | One API for web + mobile; authorization lives here (no RLS) |
 | Mobile | Expo (EAS Build / Update / Workflows) | No secrets in the app bundle — publishable keys only |
 | Hosting | Cloudflare Workers | AWS / Hetzner / Fly when needed (Alchemy supports them); Vercel projects use Vercel's own previews |
@@ -61,6 +61,24 @@ secrets.json      vault names this project uses (no values)
 .env.example      non-secret config keys
 AGENTS.md         project-specific notes; links back to this reference
 ```
+
+### 3.1 Web app conventions
+
+The linter is the rulebook; this section only records the choices no linter makes.
+
+- **Guardrails (enforced in CI, not prose):**
+  - **react-doctor** — pin the version, run with `--no-telemetry`, `--scope changed --blocking error` in CI, and install its agent skill (`npx react-doctor@<version> install`). Its ~60 rules (incl. TanStack Start rules) are the React rulebook; don't restate them here.
+  - **React Compiler** on; agents don't hand-write `useMemo`/`useCallback`.
+  - **`eslint-plugin-react-hooks`** `recommended` preset.
+  - When react-doctor flags something that doesn't apply (e.g. an SSR-only rule on a client-only route), disable that rule in config with a comment saying why — don't work around it in code.
+- **Rendering:**
+  - **Signed-in app routes: client-only** (`ssr: false` on the app's root route, via TanStack Start selective SSR). Loaders run in the browser only; no hydration mismatches, no "where does this run?" questions; same mental model as Expo.
+  - **Marketing / public pages: prerendered at build time.**
+  - **Full SSR only by exception**, per route, for public pages with dynamic content that must be indexed. Note the reason in the route file.
+- **Data:** TanStack Router loaders + TanStack Query (`queryOptions` shared by loader and component) for reads; `createServerFn` with a Zod validator and an auth check for privileged reads and all writes; `useMutation` + query invalidation after writes. URL state lives in validated search params.
+- **Forms:** TanStack Form with the same Zod schema as the server function.
+- **Live data:** TanStack Query plus Durable Object / Cloudflare Agents SDK WebSocket pushes that invalidate or update queries. TanStack DB once it reaches 1.0.
+- **Effect TS — not the default (decision open):** Effect 4 shipped 2026-10-01; models mostly know v3, and RPC/HTTP/SQL/atoms are in `effect/unstable/*`. Next new project trials it on the backend only (Effect 4 pinned, Effect repo vendored for agents, Effect kept behind Promise boundaries so web/mobile stay plain TypeScript). Decide after the trial; revisit full-stack Effect when RPC/atoms are stable.
 
 ## 4. Secrets and config
 
