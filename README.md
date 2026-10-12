@@ -4,7 +4,7 @@ Point an agent here with: *"Build <app>. Use this reference."*
 This file defines the default stack, how a project is set up, and how the dev → QA → prod loop works.
 Deviate only when the app genuinely needs it, and say why in the PR.
 
-Last verified: 2026-10-11. Items marked **(unproven)** have not been exercised end to end yet.
+Last verified: 2026-10-12. Items marked **(unproven)** have not been exercised end to end yet.
 
 ---
 
@@ -64,15 +64,21 @@ AGENTS.md         project-specific notes; links back to this reference
 
 ## 4. Secrets and config
 
-- **Infisical**, two projects shared by all apps:
-  - `dev-vault` — readable by agent sessions (dev/test keys only).
-  - `prod-vault` — readable only by CI (GitHub OIDC). Never by agent sessions.
+- **Infisical**, two projects shared by all apps (secrets live in each project's `dev` environment):
+  - `dev-vault` — dev/test keys. Readable by agent sessions and PR CI runs.
+  - `prod-vault` — production keys. Readable only by CI on `main`. Never by agent sessions or PR runs.
 - **What goes in the vault:** only values a human copied from a provider dashboard.
-  - Account-wide keys → global names: `OPENROUTER_API_KEY`, `RETELL_API_KEY`.
-  - Per-app keys → prefixed: `WORKOS_<APP>_API_KEY`.
-- **What does not:** anything IaC creates (database branches, webhook URLs, agent IDs, generated tokens) and non-secret config (publishable keys, allowed origins), which lives in code.
-- Each repo commits `secrets.json` mapping env var → vault name, e.g. `{ "WORKOS_API_KEY": "WORKOS_MYAPP_API_KEY" }`.
+  - Account-wide keys → global names: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RETELL_API_KEY`, `OPENROUTER_API_KEY`.
+  - Per-app keys → `<APP>_<PROVIDER>_<KEY>`, e.g. `FIRSTWORD_CLERK_SECRET_KEY`.
+  - The same name exists in both vaults with the dev or prod value.
+- **What does not:** anything IaC creates (database branches, webhook URLs, agent IDs, generated tokens, R2 S3 credentials) and non-secret config (publishable keys, allowed origins, endpoints), which lives in code.
+- Each repo commits `secrets.json` mapping env var → vault name, e.g. `{ "CLERK_SECRET_KEY": "FIRSTWORD_CLERK_SECRET_KEY" }`.
 - Alchemy reads secrets directly from Infisical at deploy time.
+- **Machine identities:**
+  - `coding-agent` — Universal Auth, Viewer on `dev-vault` only. Its client ID/secret are the only credentials stored in the Claude environment.
+  - `github-ci-preview` — GitHub OIDC, subject `repo:<owner>/<repo>:pull_request`, Viewer on `dev-vault`.
+  - `github-ci-prod` — GitHub OIDC, subject `repo:<owner>/<repo>:ref:refs/heads/main`, Viewer on `prod-vault`.
+- **Cloud accounts are split the same way:** a dev account (all PR stages; the agent has full access for provisioning and debugging) and a prod account (only `github-ci-prod` can deploy). For Cloudflare: two accounts under one login.
 
 ## 5. Environments
 
@@ -82,8 +88,8 @@ AGENTS.md         project-specific notes; links back to this reference
 | `prod` | CI on merge to main | Permanent | Production |
 
 - **The agent opens a draft PR as soon as it starts work** and pushes to it; that PR's stage is its working environment. One agent session = one PR.
-- **Only CI deploys.** Agent sessions never hold deploy credentials.
-- Each stage gets its own Worker URL, database branch, and provider resources (webhook endpoints, voice agents, products…) pointing at that stage. Previews use dev/test credentials.
+- **PR stages live in the dev cloud account; `prod` lives in the prod account.** CI deploys both. The agent provisions through code (edit `alchemy.run.ts`, push) and may use its dev-account token directly to debug (tail logs, query a PR database, clean up). It has no access to the prod account.
+- Each stage gets its own Worker URL (`*.workers.dev` on the dev account), database, and provider resources (webhook endpoints, voice agents, products…) pointing at that stage. Previews use dev/test credentials.
 - CI comments the preview URL (and mobile preview link) on the PR and posts test results there.
 
 ## 6. The dev → QA → prod loop
@@ -149,7 +155,16 @@ Before integrating a provider, answer and record in the project's `AGENTS.md`:
 
 ## 12. One-time human setup (shared by all apps)
 
-- Accounts: Cloudflare (Workers Paid), Neon, Infisical, WorkOS, Polar, Resend, OpenRouter, Sentry, Better Stack, PagerDuty, PostHog, Expo, GitHub.
-- Infisical: `dev-vault`, `prod-vault`; machine identities `claude-agent` (Universal Auth, read `dev-vault`) and `github-ci` (OIDC, read both).
-- Claude cloud environment: `INFISICAL_CLIENT_ID` / `INFISICAL_CLIENT_SECRET` env vars, network allowlist for provider hosts, setup script that installs deps and writes `.dev.vars` from Infisical.
-- Mac: GitHub self-hosted runner (iOS lane).
+- **Accounts:** Cloudflare, Neon, Infisical, WorkOS, Polar, Resend, OpenRouter, Sentry, Better Stack, PagerDuty, PostHog, Expo, GitHub. Start on free plans; upgrade when a quota bites (Cloudflare free = 10 D1 databases per account).
+- **Cloudflare — two accounts under one login** (account switcher → Create Account):
+  - **Prod account:** an account API token for CI → `prod-vault` as `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`. Add Zone → Workers Routes: Edit for custom domains.
+  - **Dev account:** enable a `workers.dev` subdomain; create an account API token (Start from scratch, Entire account) with Workers: Admin (Editor can't create/delete Workers), D1, Workers AI, Workers KV Storage, Workers R2 Storage, Queues, Hyperdrive, Secrets Store, AI Gateway, Vectorize (Read + Write each), Account Settings: Read. Not "Workers Scripts (Legacy)", not "Full account access" (it can create more tokens and invite members). No IP filtering. → `dev-vault` as `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`.
+- **Infisical** (US cloud): projects `dev-vault`, `prod-vault`; identities per §4.
+  - `coding-agent` can be created inside `dev-vault` (Create New → Viewer). Then open it → Universal Auth → copy the **Client ID** and create a **Client Secret** (shown once). Leave trusted IPs open.
+  - `github-ci-*` identities: create at organization level, then Assign Existing in each project.
+- **Claude cloud environment** (environment menu → Edit):
+  - Environment variables (not Network secrets — Infisical login sends the secret in the body): `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`.
+  - Allowed domains: `app.infisical.com`, `api.cloudflare.com`, plus each provider's API host.
+  - The Infisical CLI (`npm i -g @infisical/cli`) needs `SSL_CERT_FILE=/root/.ccr/ca-bundle.crt` behind the session proxy.
+  - Changes apply to **new** sessions only.
+- **Mac:** GitHub self-hosted runner (iOS lane).
