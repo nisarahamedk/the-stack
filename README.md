@@ -6,6 +6,8 @@ Deviate only when the app genuinely needs it, and say why in the PR.
 
 Last verified: 2026-10-12. Items marked **(unproven)** have not been exercised end to end yet.
 
+**Proven in a real project (FirstWord, 2026-10-12):** Alchemy v2 PR stages on the dev Cloudflare account with preview + destroy workflows (40+ preview runs); Infisical `dev-vault` login from agent sessions; prod deploy on push to `main` via GitHub Actions + wrangler (successful runs); react-doctor at zero issues in CI.
+
 ---
 
 ## 1. Principles
