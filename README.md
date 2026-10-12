@@ -76,8 +76,10 @@ AGENTS.md         project-specific notes; links back to this reference
 - Alchemy reads secrets directly from Infisical at deploy time.
 - **Machine identities:**
   - `coding-agent` — Universal Auth, Viewer on `dev-vault` only. Its client ID/secret are the only credentials stored in the Claude environment.
-  - `github-ci-preview` — GitHub OIDC, subject `repo:<owner>/<repo>:pull_request`, Viewer on `dev-vault`.
-  - `github-ci-prod` — GitHub OIDC, subject `repo:<owner>/<repo>:ref:refs/heads/main`, Viewer on `prod-vault`.
+  - `github-ci-preview` — GitHub OIDC (no stored secret), subject `repo:<owner>/*:pull_request` (one identity for all your repos), Viewer on `dev-vault`.
+  - `github-ci-prod` — GitHub OIDC, subject `repo:<owner>/*:ref:refs/heads/main` while solo (per-repo once projects have different collaborators), Viewer on `prod-vault`.
+  - Why three: preview vs prod is the security boundary (PR runs execute unreviewed code and must never reach `prod-vault`; GitHub's subject claim can't be forged by a PR). Agent vs CI are split so GitHub stores no secret and each can be revoked independently.
+  - `coding-agent` reads every app's dev keys — acceptable only because `dev-vault` holds test/sandbox keys with spending caps. Per-app scoping needs paid custom roles or more identities than the free plan allows.
 - **Cloud accounts are split the same way:** a dev account (all PR stages; the agent has full access for provisioning and debugging) and a prod account (only `github-ci-prod` can deploy). For Cloudflare: two accounts under one login.
 
 ## 5. Environments
@@ -161,7 +163,8 @@ Before integrating a provider, answer and record in the project's `AGENTS.md`:
   - **Dev account:** enable a `workers.dev` subdomain; create an account API token (Start from scratch, Entire account) with Workers: Admin (Editor can't create/delete Workers), D1, Workers AI, Workers KV Storage, Workers R2 Storage, Queues, Hyperdrive, Secrets Store, AI Gateway, Vectorize (Read + Write each), Account Settings: Read. Not "Workers Scripts (Legacy)", not "Full account access" (it can create more tokens and invite members). No IP filtering. → `dev-vault` as `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`.
 - **Infisical** (US cloud): projects `dev-vault`, `prod-vault`; identities per §4.
   - `coding-agent` can be created inside `dev-vault` (Create New → Viewer). Then open it → Universal Auth → copy the **Client ID** and create a **Client Secret** (shown once). Leave trusted IPs open.
-  - `github-ci-*` identities: create at organization level, then Assign Existing in each project.
+  - `github-ci-*` identities: create inside their vault (Create New → Viewer), no secret. Add Auth Method → OIDC Auth: discovery URL and issuer `https://token.actions.githubusercontent.com`, CA cert blank, subject per §4, audience `https://github.com/<owner>`, claims blank. Remove Universal Auth.
+  - Repos created after 2026-07-15 use an immutable subject format with numeric IDs (`repo:<owner>@<owner_id>/<repo>@<repo_id>:...`); add `repo:<owner>@<owner_id>/*:...` when the first such repo appears. Never use `repo:<owner>*` (matches other users' names).
 - **Claude cloud environment** (environment menu → Edit):
   - Environment variables (not Network secrets — Infisical login sends the secret in the body): `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`.
   - Allowed domains: `app.infisical.com`, `api.cloudflare.com`, plus each provider's API host.
