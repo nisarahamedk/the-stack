@@ -79,6 +79,7 @@ AGENTS.md         project-specific notes; links back to this reference
   - `coding-agent` reads every app's dev keys — acceptable only because `dev-vault` holds test/sandbox keys with spending caps. Per-app scoping needs paid custom roles or more identities than the free plan allows.
 - **Cloud accounts are split:** a dev account (all PR stages; the agent has full access for provisioning and debugging) and a prod account. For Cloudflare: two accounts under one login.
 - **Prod deploys:** CI on `main` uses a **per-app deploy token** for the prod account (scoped to that app's Workers/zone), stored as a GitHub repo secret. A compromise of one repo reaches only that app.
+- **Deploy pipeline: GitHub Actions** (workflow in the repo: migrations → deploy → smoke test → rollback; logs visible to agents on the PR/commit). Cloudflare **Workers Builds** (Git integration) is fine for simple apps without a database, but its auto-created token is broad and lacks D1, its commands live in the dashboard, and its branch previews would land in the prod account.
 - **The real prod boundary is who can deploy:** deployed code can read its own secrets. Protect `main` with required PR review (GitHub Pro for private repos; environment approval gates aren't available for private repos below Enterprise). Agents only open PRs; the human approves merges. Plus: MFA on GitHub, Cloudflare, Infisical; pin Actions to SHAs; commit lockfiles; Renovate with a minimum release age.
 
 ## 5. Environments
