@@ -64,23 +64,22 @@ AGENTS.md         project-specific notes; links back to this reference
 
 ## 4. Secrets and config
 
-- **Infisical**, two projects shared by all apps (secrets live in each project's `dev` environment):
-  - `dev-vault` — dev/test keys. Readable by agent sessions and PR CI runs.
-  - `prod-vault` — production keys. Readable only by CI on `main`. Never by agent sessions or PR runs.
-- **What goes in the vault:** only values a human copied from a provider dashboard.
+- **Dev keys → Infisical `dev-vault`** (env `dev`), shared by all apps. Dev keys must be *readable* by several consumers (agent sessions, PR CI, IaC creating per-PR provider resources), so they need one readable source.
+- **Prod keys → the production host's own write-only secret store**, never Infisical. On Cloudflare: Worker secrets on each app's Worker in the prod account, set by the human (dashboard or `wrangler secret put`). Only the running app reads them; values can't be read back via API or dashboard, and each app's secrets are bound to its own Worker. Rotation: reissue at the provider, paste into Cloudflare. Other hosts: Vercel env vars / AWS Secrets Manager.
+- **What goes in `dev-vault`:** only values a human copied from a provider dashboard.
   - Account-wide keys → global names: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RETELL_API_KEY`, `OPENROUTER_API_KEY`.
   - Per-app keys → `<APP>_<PROVIDER>_<KEY>`, e.g. `FIRSTWORD_CLERK_SECRET_KEY`.
-  - The same name exists in both vaults with the dev or prod value.
 - **What does not:** anything IaC creates (database branches, webhook URLs, agent IDs, generated tokens, R2 S3 credentials) and non-secret config (publishable keys, allowed origins, endpoints), which lives in code.
 - Each repo commits `secrets.json` mapping env var → vault name, e.g. `{ "CLERK_SECRET_KEY": "FIRSTWORD_CLERK_SECRET_KEY" }`.
-- Alchemy reads secrets directly from Infisical at deploy time.
+- Alchemy reads dev secrets from Infisical at deploy time for PR stages. For `prod` it must not manage (and must not delete) the manually set Worker secrets **(unproven — verify per project)**.
 - **Machine identities:**
   - `coding-agent` — Universal Auth, Viewer on `dev-vault` only. Its client ID/secret are the only credentials stored in the Claude environment.
   - `github-ci-preview` — GitHub OIDC (no stored secret), subject `repo:<owner>/*:pull_request` (one identity for all your repos), Viewer on `dev-vault`.
-  - `github-ci-prod` — GitHub OIDC, subject `repo:<owner>/*:ref:refs/heads/main` while solo (per-repo once projects have different collaborators), Viewer on `prod-vault`.
-  - Why three: preview vs prod is the security boundary (PR runs execute unreviewed code and must never reach `prod-vault`; GitHub's subject claim can't be forged by a PR). Agent vs CI are split so GitHub stores no secret and each can be revoked independently.
+  - No prod identity: CI never reads production secrets. Agent vs CI are separate identities so GitHub stores no Infisical secret and each can be revoked independently.
   - `coding-agent` reads every app's dev keys — acceptable only because `dev-vault` holds test/sandbox keys with spending caps. Per-app scoping needs paid custom roles or more identities than the free plan allows.
-- **Cloud accounts are split the same way:** a dev account (all PR stages; the agent has full access for provisioning and debugging) and a prod account (only `github-ci-prod` can deploy). For Cloudflare: two accounts under one login.
+- **Cloud accounts are split:** a dev account (all PR stages; the agent has full access for provisioning and debugging) and a prod account. For Cloudflare: two accounts under one login.
+- **Prod deploys:** CI on `main` uses a **per-app deploy token** for the prod account (scoped to that app's Workers/zone), stored as a GitHub repo secret. A compromise of one repo reaches only that app.
+- **The real prod boundary is who can deploy:** deployed code can read its own secrets. Protect `main` with required PR review (GitHub Pro for private repos; environment approval gates aren't available for private repos below Enterprise). Agents only open PRs; the human approves merges. Plus: MFA on GitHub, Cloudflare, Infisical; pin Actions to SHAs; commit lockfiles; Renovate with a minimum release age.
 
 ## 5. Environments
 
@@ -159,9 +158,9 @@ Before integrating a provider, answer and record in the project's `AGENTS.md`:
 
 - **Accounts:** Cloudflare, Neon, Infisical, WorkOS, Polar, Resend, OpenRouter, Sentry, Better Stack, PagerDuty, PostHog, Expo, GitHub. Start on free plans; upgrade when a quota bites (Cloudflare free = 10 D1 databases per account).
 - **Cloudflare — two accounts under one login** (account switcher → Create Account):
-  - **Prod account:** an account API token for CI → `prod-vault` as `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`. Add Zone → Workers Routes: Edit for custom domains.
+  - **Prod account:** per app, an account API token scoped to that app's Workers (plus D1 and Zone → Workers Routes: Edit for its domain) → GitHub repo secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`. App secrets go on the Worker as Worker secrets.
   - **Dev account:** enable a `workers.dev` subdomain; create an account API token (Start from scratch, Entire account) with Workers: Admin (Editor can't create/delete Workers), D1, Workers AI, Workers KV Storage, Workers R2 Storage, Queues, Hyperdrive, Secrets Store, AI Gateway, Vectorize (Read + Write each), Account Settings: Read. Not "Workers Scripts (Legacy)", not "Full account access" (it can create more tokens and invite members). No IP filtering. → `dev-vault` as `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`.
-- **Infisical** (US cloud): projects `dev-vault`, `prod-vault`; identities per §4.
+- **Infisical** (US cloud): project `dev-vault`; identities per §4.
   - `coding-agent` can be created inside `dev-vault` (Create New → Viewer). Then open it → Universal Auth → copy the **Client ID** and create a **Client Secret** (shown once). Leave trusted IPs open.
   - `github-ci-*` identities: create inside their vault (Create New → Viewer), no secret. Add Auth Method → OIDC Auth: discovery URL and issuer `https://token.actions.githubusercontent.com`, CA cert blank, subject per §4, audience `https://github.com/<owner>`, claims blank. Remove Universal Auth.
   - Repos created after 2026-07-15 use an immutable subject format with numeric IDs (`repo:<owner>@<owner_id>/<repo>@<repo_id>:...`); add `repo:<owner>@<owner_id>/*:...` when the first such repo appears. Never use `repo:<owner>*` (matches other users' names).
