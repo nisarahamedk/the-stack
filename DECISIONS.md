@@ -5,7 +5,7 @@ When something is decided, move it into the README and mark it **Decided** here 
 
 Statuses: **Decided** (in README) · **Proposed** (opinion formed, awaiting approval) · **Open** (needs research or a call) · **Verify** (decided, but not yet proven in a real project).
 
-Last updated: 2026-10-14.
+Last updated: 2026-10-14 (P7, O13 added).
 
 ---
 
@@ -75,13 +75,25 @@ Last updated: 2026-10-14.
   7. Typed `track()` with an event catalog in code.
 - Sources: https://rybbit.com/blog/posthog-pricing · https://amplitude.com/compare/posthog-vs-fullstory
 
+### P7. Code standards that make agent code verifiable (independent of Effect)
+Inspired by Dillon Mulroy's project docs ([coding-standards](https://github.com/dmmulroy/cf-workflow-pool/blob/main/docs/coding-standards.md), [errors](https://github.com/dmmulroy/cf-workflow-pool/blob/main/docs/errors.md)); no license on that repo, so we write our own versions rather than copying.
+- **Errors are product interfaces and observability data:** every error names the failed operation, the most specific safe reason, and a way forward (fix input, safe retry, reconcile, or contact support with a request ID). Stable machine-readable codes with variant-specific details; a truthful `retryable` that matches the operation's idempotency; never claim "nothing changed" unless provable; public errors carry `requestId` (= trace ID) and never secrets, SQL, stack traces or vendor bodies.
+- **No catch-all error translation:** each known error is translated explicitly at each boundary, so a new failure type fails compilation until someone decides its classification.
+- **Parse once at the boundary, then preserve types:** decode unknown input (HTTP, DB rows, queue messages, env, vendor payloads) with the boundary's schema; inner code receives parsed domain types; never widen known values to `unknown`/records; `as unknown as` / `as any` are review blockers.
+- **Monorepo boundaries:** apps never import other apps; packages never import apps; shared capability moves to a package when a second consumer appears. (Exception we chose deliberately: `contract` and `core` exist from day one, because more clients are expected.)
+- **Durable Objects keyed by canonical domain IDs**; callers use an application-level client, never raw stubs.
+- **HTTP endpoints versioned from `/v1`.**
+- **JSDoc on every exported symbol**, stating what the signature can't.
+- **Test layers/fakes cross the same interface as production** and behave faithfully; no partial mocks.
+- Status: proposed as a `docs/coding-standards.md` + `docs/errors.md` pair that every project copies and adapts (the-stack ships our versions).
+
 ---
 
 ## Open — needs research or a call
 
 | # | Topic | What's open | Notes |
 |---|---|---|---|
-| O1 | **Effect TS** | Adopt fully / backend only / not | Current plan: trial on a backend slice. New data point (2026-10-14): Dillon Mulroy (Cloudflare, Effect advocate) reports Opus 5.5 "starting to build this trust, especially with code/services written in effect." Candidate trial: webhook/inbox/outbox pipeline (P4), where typed errors and retries pay off most. Effect 4 is ~2 weeks old; RPC/atoms still unstable. |
+| O1 | **Effect TS** | Adopt fully / backend only / not | Current plan: trial on a backend slice. 2026-10-14: Dillon shared the standards he carries between projects (Effect services + Layers with faithful test layers, tagged errors translated explicitly with `catchTags`, Schema parsing at boundaries, `Option` for optional values, Effect HttpApi with generated OpenAPI, Durable Objects as Effect HTTP services). These are concrete, agent-enforceable rules, which is the strongest argument for Effect so far. New data point (2026-10-14): Dillon Mulroy (Cloudflare, Effect advocate) reports Opus 5.5 "starting to build this trust, especially with code/services written in effect." Candidate trial: webhook/inbox/outbox pipeline (P4), where typed errors and retries pay off most. Effect 4 is ~2 weeks old; RPC/atoms still unstable. |
 | O2 | Design-system repo | Create `ui` registry repo; brand tokens | Depends on P1. |
 | O3 | Observability backend | Axiom vs Honeycomb | Both have MCP; Axiom proposed. Re-check costs after Cloudflare's 2026-12-01 pricing change. |
 | O4 | Per-resource sharing | WorkOS FGA vs OpenFGA | Only when an app needs it; confirm WorkOS FGA pricing. |
@@ -92,6 +104,7 @@ Last updated: 2026-10-14.
 | O9 | FirstWord data | Stay on D1 or move to Neon (RLS, branching) | D1 has no RLS; relevant once orgs/B2B matter. |
 | O10 | Project kickoff | Template repo + kickoff prompts (stack session → project orchestrator → workers) | Deferred. |
 | O11 | Keeping the-stack current | Quarterly re-verify routine that opens a PR | Deferred. |
+| O13 | **Contract layer if Effect wins** | oRPC vs Effect HttpApi | Effect HttpApi also gives a typed contract + OpenAPI + typed client. If O1 lands on "adopt", decide whether oRPC stays. **Recommendation: hold FirstWord's oRPC migration until O1 is decided**, to avoid migrating twice. |
 | O12 | One-time setup | Sentry + Better Stack accounts; Mac self-hosted runner (when mobile starts) | |
 
 ---
