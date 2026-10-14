@@ -31,7 +31,7 @@ Errors are typed values, not strings. Each carries:
 - `retryable`, truthful for this operation;
 - at public boundaries, a `requestId` equal to the trace ID (see DECISIONS P3).
 
-Model errors as **discriminated unions with variant-specific details**, never a free-form `details: Record<string, unknown>` that lets the code and details disagree.
+Model errors as **discriminated unions on a literal `code`, with variant-specific details**, never a free-form `details: Record<string, unknown>` that lets the code and details disagree. Every error union uses `code` as its discriminant, so translation can switch on it exhaustively. **(Effect)** `_tag` maps one-to-one to `code`.
 
 ## Internal vs public
 
@@ -45,6 +45,13 @@ Model errors as **discriminated unions with variant-specific details**, never a 
 - **No catch-all** that silently maps unknown failures to a generic response. A new error type must fail type-checking until someone decides its code, message, status, retry guidance and telemetry.
   - Plain TypeScript / oRPC: an exhaustive `switch` on the error's `code` with a `never` check in the default branch; oRPC typed errors declared per procedure in the contract.
   - Effect: `Effect.catchTags` listing each tag; leave unhandled tags in the error channel on purpose.
+- **One exception: a single top-level handler for defects.** Unexpected throws (bugs, broken invariants) that are not typed errors get caught once, at the outermost layer of each entrypoint (fetch, queue, alarm, workflow): log with the trace ID, report to Sentry, return `500` with `requestId` and `retryable: false`. It never handles an expected, typed error; those must already be translated.
+
+## Showing errors in the UI
+
+- The UI maps each error `code` to **its own user-facing copy**, written for that screen. Never render a server `message` verbatim; it is written for API callers and operators.
+- Unknown codes (an older client meeting a newer server) fall back to a generic message plus the `requestId`, so support can find the trace.
+- Field violations attach to their form fields; `retryable` decides whether a retry action is offered.
 
 ## HTTP status
 
@@ -76,4 +83,5 @@ Before adding or changing an error:
 7. Can the code or message be found by searching the source?
 8. Does the public `requestId` match a trace?
 9. Are secrets, private causes and raw external data excluded?
-10. Is every boundary translation explicit, with no catch-all?
+10. Is every boundary translation explicit, with no catch-all (except the top-level defect handler)?
+11. Does the UI have its own copy for this code?

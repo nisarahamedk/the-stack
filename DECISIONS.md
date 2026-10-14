@@ -86,6 +86,13 @@ Inspired by Dillon Mulroy's project docs ([coding-standards](https://github.com/
 - **JSDoc on every exported symbol**, stating what the signature can't.
 - **Test layers/fakes cross the same interface as production** and behave faithfully; no partial mocks.
 - Every project copies and adapts both docs. The user will flag any rule they disagree with.
+- **Refinements (2026-10-14, after review):**
+  - Consistency and clear boundaries beat brevity; boilerplate is fine for agents. Every Durable Object has the same explicit shape (`ICallClient` / `CallClient` / `CallServer`) in plain TS too, not only with Effect.
+  - Every rule is tagged with how it is checked (`type`, `lint`, `test`, `ci`, `review`); prefer deterministic checks, and promote `review` rules that keep breaking.
+  - No catch-all for expected errors, but one top-level defect handler per entrypoint (log + Sentry + `500` with `requestId`).
+  - The UI maps error codes to its own copy; server messages are never shown verbatim.
+  - Every error union discriminates on a literal `code`.
+  - JSDoc on every export stays (presence linted).
 
 ---
 
