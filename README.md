@@ -1,6 +1,8 @@
 # Agent Stack — reference for building new apps
 
 Point an agent here with: *"Build <app>. Use this reference."*
+
+**Purpose:** high-performing, highly reliable, scalable and extensible software, built mostly by agents, with the judgement behind each choice written down so it can be checked and revisited.
 This file defines the default stack, how a project is set up, and how the dev → QA → prod loop works.
 Deviate only when the app genuinely needs it, and say why in the PR.
 
@@ -20,6 +22,8 @@ Last verified: 2026-10-12. Items marked **(unproven)** have not been exercised e
 4. **An isolated environment per PR.** The agent opens a draft PR early and uses its environment. No shared staging, no queueing.
 5. **Hard spending caps wherever a provider offers them**; alerts plus a kill switch where it doesn't.
 6. **Portable by default.** Standard Postgres, framework-agnostic app code, platform-specific bits behind small interfaces.
+7. **Quality is measured, not assumed.** Performance, reliability and scale have explicit targets that CI and production telemetry check (DECISIONS P8).
+8. **Judgement is recorded.** Every default has a reason and a trigger for revisiting it in [DECISIONS.md](DECISIONS.md); a project that deviates says why in its PR.
 
 ## 2. Default stack
 

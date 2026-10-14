@@ -5,7 +5,7 @@ When something is decided, move it into the README and mark it **Decided** here 
 
 Statuses: **Decided** (in README) · **Proposed** (opinion formed, awaiting approval) · **Open** (needs research or a call) · **Verify** (decided, but not yet proven in a real project).
 
-Last updated: 2026-10-14 (P7, O13 added).
+Last updated: 2026-10-14 (P7, P8, O13 added).
 
 ---
 
@@ -93,6 +93,16 @@ Inspired by Dillon Mulroy's project docs ([coding-standards](https://github.com/
   - The UI maps error codes to its own copy; server messages are never shown verbatim.
   - Every error union discriminates on a literal `code`.
   - JSDoc on every export stays (presence linted).
+
+### P8. Quality targets: performance, reliability, scale
+The README promises these; nothing enforces them yet. Proposed defaults per project, adjusted per app:
+- **SLOs from day one:** availability and latency targets per critical user flow (e.g. 99.9% success, API p95 < 300 ms at the edge), measured from traces (P3). Error budget decides when reliability work beats feature work.
+- **Performance budgets in CI:** web Core Web Vitals (LCP < 2.5 s, INP < 200 ms, CLS < 0.1) on PR previews; JS bundle size limit per route; Worker CPU time per request watched.
+- **Load test before launch and on hot-path changes:** k6 (or similar) against the PR stage at ~10× expected peak; find the first bottleneck (DB connections, DO hot keys, vendor rate limits).
+- **Failure-mode tests:** each vendor dependency has a test for timeout, 429 and 5xx; each has a timeout, a retry policy that matches idempotency (P4), and a defined degraded behaviour.
+- **Scale by design:** stateless Workers; per-entity Durable Objects (no global singletons); DB indexes reviewed with query plans for every new query on a hot path; pagination everywhere (cursor-based).
+- **Extensibility:** additive contract changes (§3.2), capabilities behind interfaces (coding-standards §9), feature flags for risky rollouts (P6).
+- **Open:** exact default numbers; which load-testing tool runs from GitHub Actions against PR stages; whether SLO burn alerts go to the on-call setup.
 
 ---
 
