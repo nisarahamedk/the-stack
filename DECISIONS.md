@@ -75,7 +75,7 @@ Last updated: 2026-10-14 (P7, O13 added).
   7. Typed `track()` with an event catalog in code.
 - Sources: https://rybbit.com/blog/posthog-pricing · https://amplitude.com/compare/posthog-vs-fullstory
 
-### P7. Code standards that make agent code verifiable (independent of Effect)
+### P7. Code standards that make agent code verifiable — **Decided 2026-10-14**: [docs/coding-standards.md](docs/coding-standards.md), [docs/errors.md](docs/errors.md)
 Inspired by Dillon Mulroy's project docs ([coding-standards](https://github.com/dmmulroy/cf-workflow-pool/blob/main/docs/coding-standards.md), [errors](https://github.com/dmmulroy/cf-workflow-pool/blob/main/docs/errors.md)); no license on that repo, so we write our own versions rather than copying.
 - **Errors are product interfaces and observability data:** every error names the failed operation, the most specific safe reason, and a way forward (fix input, safe retry, reconcile, or contact support with a request ID). Stable machine-readable codes with variant-specific details; a truthful `retryable` that matches the operation's idempotency; never claim "nothing changed" unless provable; public errors carry `requestId` (= trace ID) and never secrets, SQL, stack traces or vendor bodies.
 - **No catch-all error translation:** each known error is translated explicitly at each boundary, so a new failure type fails compilation until someone decides its classification.
@@ -85,7 +85,7 @@ Inspired by Dillon Mulroy's project docs ([coding-standards](https://github.com/
 - **HTTP endpoints versioned from `/v1`.**
 - **JSDoc on every exported symbol**, stating what the signature can't.
 - **Test layers/fakes cross the same interface as production** and behave faithfully; no partial mocks.
-- Status: proposed as a `docs/coding-standards.md` + `docs/errors.md` pair that every project copies and adapts (the-stack ships our versions).
+- Every project copies and adapts both docs. The user will flag any rule they disagree with.
 
 ---
 
