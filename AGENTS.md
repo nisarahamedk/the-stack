@@ -54,6 +54,37 @@ Real projects (FirstWord is the first) exist to **prove or disprove** the-stack'
 - Don't shape a default around one project's constraints; if a project needs something unusual, it records a deviation in its own repo.
 - If you catch yourself writing "for <project>, …" in this repo, stop and restate it at the archetype level.
 
+## Architecture judgement and taste
+
+What we have converged on so far. Use these to judge any new proposal; if one of them is wrong, challenge it in DECISIONS rather than silently working around it.
+
+### Invariants (hold for every archetype)
+
+1. **One action layer.** Every capability is defined once in the contract and runs through `core`. The UI, public API, in-app agents, MCP servers and admin tools are all clients of it. No side doors: no admin tool with direct DB credentials, no agent driving our own UI by clicks.
+2. **One actor model.** Every call has a principal: user, staff, tenant member, end customer, or an agent acting on behalf of one of them. `can()` decides. An agent never has more authority than the person it acts for.
+3. **Every piece of state has one owner.** Domain state (database, Durable Objects), view state (browser), agent run state (agent). Never two copies of the truth that can drift.
+4. **Risk-tiered actions.** `read` / `reversible` / `irreversible` / `external`. Reversible beats approval prompts; the server, not the client, enforces approval for the risky tiers.
+5. **Safe to retry.** Idempotency on every write, every consumer runs twice safely.
+6. **Parse at the boundary, typed errors, explicit translation.** (docs/coding-standards.md, docs/errors.md)
+7. **Environments per PR, prod isolated, secrets only in the vault.**
+8. **Observable from day one.** The public `requestId` is the trace ID.
+
+### Taste (how we judge options)
+
+- **Separate the layers before picking tools.** Runtime vs wire vs UI; protocol vs framework; identity vs authorization; transport vs state. Most bad choices come from treating several layers as one.
+- **Take the ideas, not the framework**, when a framework wants to own our core (auth, data, actions, sync). A reference stack can't have its foundations owned by a beta product.
+- **Protocols over products, but watch before building.** Adopt open standards (MCP, OpenAPI, AG-UI shapes); don't build for a standard no client calls yet.
+- **Extension points over premature features.** Design so B2C → B2B → B2B2C, single-region → multi-region, pooled → isolated tenants are additive changes (e.g. orgs and `tenantId` from day one, audience-scoped contract namespaces, one actor model for every tier).
+- **Pin and checkpoint anything beta.** Name the revisit trigger (e.g. "re-check at 1.0").
+- **Cost and limits are architecture.** Free tiers, per-unit pricing and hard caps belong in the decision, not an afterthought.
+- **People stay accountable.** Agents disclose, show status, stop on request; review shows outcomes (what changed), not traces.
+
+### Mistakes we have already made (don't repeat)
+
+- Framing a stack decision around the project in flight instead of the archetypes.
+- Stating vendor capabilities from memory that turned out wrong; verify against current docs.
+- Long surveys with no recommendation; putting one project's domain words into generic docs.
+
 ## How to make decisions here
 
 - **Research before opinion.** Check current sources (releases, docs, pricing, standards) — the ecosystem moves monthly and training data goes stale. Prefer primary sources; mark vendor claims as vendor claims; say when you could not verify something.
