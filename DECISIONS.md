@@ -5,7 +5,7 @@ When something is decided, move it into the README and mark it **Decided** here 
 
 Statuses: **Decided** (in README) · **Proposed** (opinion formed, awaiting approval) · **Open** (needs research or a call) · **Verify** (decided, but not yet proven in a real project).
 
-Last updated: 2026-10-15 (P9, P10, P11, O15 added).
+Last updated: 2026-10-15 (P9–P11 re-examined against every archetype; P12 and O16–O21 added).
 
 ---
 
@@ -121,6 +121,15 @@ Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition 
 - **Where the protocols fit:** AG-UI is the wire between our in-app agent and our UI (run events, tool calls, interrupts, state snapshot/patch). It carries run and view state only, never a second copy of domain truth. WebMCP registers the same UI tools and actions for an agent already in the person's browser (origin trial from Chrome 149). MCP serves headless external agents; MCP Apps embeds our UI in Claude/ChatGPT. All four call the same actions.
 - **Watch, don't build yet:** MCP Apps (render our UI inside Claude/ChatGPT; final spec, supported by both) when a project wants it; WebMCP (flag-gated in Chrome, no mainstream agent calls it yet); A2A.
 - **Open:** O14 (agent runtime and UI wire); how the MCP server is generated from the contract (oRPC vs Effect, O13); where risk level lives in the contract; proposal storage shape.
+- **Re-examined against every archetype (2026-10-15). Proposed amendments** ([docs/archetypes.md](docs/archetypes.md) §3, §7):
+  - *Holds everywhere:* one action layer, risk tiers, reversible beats approve, outcomes over traces, untrusted content, three kinds of state.
+  - **One shared `Actor`** (archetypes §3) for P9, P10 and P11. It adds `apiKey` and `system` principals. It also splits agents into **delegated** (a person's assistant) and **service** (works for the principal while talking to someone else: an org's support bot answering its customers, a voice agent taking calls for a user, a seller's agent). P9 only described delegated agents; service agents appear in B2B2C, marketplace and AI products.
+  - **Org agent policy (B2B, B2B2C):** org admins can turn agents off, limit tools or risk tiers, and set data retention. `can()` intersects it with the person's permissions and the session grant. Enterprise buyers ask for this before anything else.
+  - **Approvals are server-side pending operations**, the same object as P10's. They are shown over AG-UI and push, and can be approved from any device. Mobile and multi-device use need this, and it answers "proposal storage shape".
+  - **Risk level lives in procedure metadata** (with audience, exposure and idempotency; P12). That answers "where risk level lives".
+  - **Budgets:** every agent run has a per-actor and per-org budget, enforced on the server from the usage ledger (P12). B2C free tiers and usage-priced API products break without it.
+  - **External agents:** target MCP 2026-07-28. It is stateless; OAuth uses Client ID Metadata Documents, and dynamic client registration is deprecated. In B2B, the Enterprise-Managed Authorization extension lets the org's identity provider decide which agents connect. Risk tiers map to OAuth scopes.
+  - *Variants:* B2C → per-user budgets; B2B → org policy; B2B2C → service agents serving end customers; marketplace → agents buying or selling for people (always `external`, always approval; agentic-commerce protocols are a watch item, not yet researched); realtime → the agent has presence like a collaborator; API product → MCP + OAuth is a first-class surface; mobile → push approvals.
 
 ### P10. Back-office admin
 - **Admin is another client of the actions, never a side door to the database.** Admin-only procedures live in the contract under an internal `admin` namespace (excluded from public OpenAPI) and run through `core`, so invariants, idempotency, audit and errors stay the same. No Retool-style tools holding prod DB credentials.
@@ -140,6 +149,15 @@ Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition 
 - **Reads that can't hurt prod:** admin queries use a read-only DB role (or replica) with timeouts; ad-hoc SQL only through that role, logged. Analytics belongs in PostHog or a warehouse, not admin.
 - **Built with our stack:** TanStack Start + shadcn + TanStack Table, shared admin components in the private registry (data table, entity page, audit timeline, operation dialog with reason/confirm, impersonation banner). Exists in every PR stage with seed data, so agents can test it.
 - **Open:** audit log store (Postgres table vs R2/Axiom); retention period.
+- **Re-examined against every archetype (2026-10-15). Proposed amendments:**
+  - *Holds everywhere:* admin as a client of the actions, named operations, every write audited, admin MCP with server-enforced approval (the Decided part is unchanged; target MCP 2026-07-28, see P9).
+  - **One namespace name:** `admin.*` in every archetype (P11's `platform.*` becomes `admin.*`).
+  - **Customers can see support access.** This rule moves from P11 into P10 because B2B needs it as much as B2B2C: org admins see a log of staff access to their org, and an org can require its approval first. In B2C, access is recorded but not shown.
+  - **Work queues:** a `case` primitive (assignee, status, SLA, linked entities, agent triage, human decision) for moderation, disputes, KYC review, abuse and support. Entity pages alone don't cover B2C abuse or marketplace trust and safety.
+  - **Audit store (answers the open item):** one append-only `audit_event` table in Postgres. `core` writes it for every write by any actor, not only admin. It is partitioned by month and archived to R2. A customer-visible subset feeds the org audit log (B2B). Use WorkOS Audit Logs only when an enterprise wants SIEM streaming ($125/month per connection, checked 2026-10-15). Retention stays open: B2B enterprise usually asks for a year or more.
+  - **Admin components are scope-agnostic**, so the B2B org console and the B2B2C tenant console are built from the same kit.
+  - **The internal-tool archetype is P10 as the whole product.**
+  - *Variants:* B2C → deletion, export and abuse operations; API product → key revocation and quota operations; realtime → inspect live sessions and force-disconnect through the Durable Object client; mobile → minimum-supported-version switch; AI → per-org cost view and a per-org agent kill switch.
 
 ### P11. B2B2C: tenants with their own customers and mobile apps
 Three audiences, one contract, one action layer:
@@ -162,6 +180,36 @@ Three audiences, one contract, one action layer:
 - **Money flows are two different systems:** tenants pay us (subscription billing, README default); end customers paying tenants needs a marketplace/Connect-style processor with payouts, not a merchant of record. Digital goods sold inside the mobile app fall under store in-app purchase rules.
 - **Isolation tiers:** pooled (shared DB, `tenantId` + RLS) by default; per-tenant database or Durable Object namespace only for tenants who pay for it.
 - **Open:** O15 end-customer auth provider; marketplace payments provider; whether white-label is offered at all for a given product.
+- **Re-examined against every archetype (2026-10-15). Proposed amendments:**
+  - *Holds:* three audiences, one action layer; the tenant console is the product; typed tenant configuration; two mobile modes; custom domains; per-tenant sending identity.
+  - **The tenant is the org.** Use one `orgId` column everywhere (not `tenantId`), so a B2B product that grows into B2B2C needs no migration. End-customer rows add `customerId`.
+  - **Namespaces:** the primary audience lives at the contract root, and only secondary audiences get a prefix (`admin.*`, `customer.*`). A `tenant.*` prefix would force renaming every B2B procedure when the product grows into B2B2C.
+  - **End-customer identity, default flipped.** The default becomes one platform identity with a per-org customer profile. That fits the shared app (the default mobile mode): a person who uses two orgs signs in once, and each org sees only its own profile. Per-org isolated pools are reserved for white-label tiers that need them. Checked 2026-10-15: WorkOS AuthKit supports a flat, org-less pool (free to 1M MAU) but has no self-serve per-tenant pools, so the old default was also the expensive one. O15 updated.
+  - **Configuration and entitlements are separate.** `orgConfig` holds what the org chose (branding, domains, senders). Entitlements hold what it paid for, and billing writes them. P11 had them together.
+  - **Isolation tiers corrected:** pooled → dedicated database (a Neon project per org, routed by `orgId`) → regional (an EU database plus Durable Object jurisdiction) → dedicated deployment. "Per-tenant Durable Object namespace" is dropped: a namespace is per class binding, so per-tenant objects come from keying (Workers for Platforms if per-tenant code is ever needed). Tracked in O20.
+  - **Org API keys** are `apiKey` principals. **Service agents** serving end customers for an org follow P9.
+  - **Third-party payments** move out to O16, shared with marketplaces.
+
+### P12. Archetype guide and day-one seams
+- **Proposed:** [docs/archetypes.md](docs/archetypes.md) becomes the kickoff guide. Each project names its archetypes, builds the core, adds only the variants for the archetypes it is today, lays the seams, and records all of this in its `AGENTS.md`.
+- **Day-one seams in every product** (archetypes §6.1):
+  - `orgId` on every tenant-owned row, with personal orgs in B2C and internal tools;
+  - the shared `Actor`;
+  - action metadata in the contract (audience, risk tier, exposure, idempotency) as oRPC procedure metadata;
+  - entitlements that product code reads and only billing providers write;
+  - an append-only usage ledger;
+  - an audit stream for every write;
+  - our own `user`/`org` tables, with identity provider IDs as foreign links;
+  - typed `orgConfig`;
+  - Durable Objects behind a client;
+  - an additive `/v1` contract.
+- **Amends P2:**
+  - B2C users get a personal org.
+  - Marketplace transactions are scoped by party (`buyerOrgId`, `sellerOrgId`).
+  - `orgId` comes from the verified session: for personal orgs it is derived on the server from the user, not carried in the token. Our `org` table is the tenancy source of truth; a WorkOS organization is linked only when SSO or managed membership is needed.
+- **Why:** each seam costs a table, a type or a field on day one. Retrofitting one means migrating every table or every handler, and moving between archetypes is the common path (B2C → B2B, B2B → API, any → agent-native).
+- **Alternatives considered:** per-archetype starter templates (they drift apart and double maintenance); laying seams only when needed (cheap until the move, then the most expensive migrations there are).
+- **Revisit if:** a seam goes unused across the first three products, or its day-one cost turns out to matter (e.g. personal orgs at consumer scale).
 
 ---
 
@@ -181,6 +229,12 @@ Three audiences, one contract, one action layer:
 | O10 | Project kickoff | Template repo + kickoff prompts (stack session → project orchestrator → workers) | Deferred. |
 | O11 | Keeping the-stack current | Quarterly re-verify routine that opens a PR | Deferred. |
 | O13 | **Contract layer if Effect wins** | oRPC vs Effect HttpApi | Effect HttpApi also gives a typed contract + OpenAPI + typed client. If O1 lands on "adopt", decide whether oRPC stays. **Recommendation: hold FirstWord's oRPC migration until O1 is decided**, to avoid migrating twice. |
+| O16 | **Third-party payments** (marketplace, B2B2C) | Processor, charge model, who carries disputes, KYC flow, seller tax reporting | Checked 2026-10-15: no merchant of record allows marketplaces (Polar, Paddle and Lemon Squeezy prohibit them; Stripe Managed Payments excludes Connect). **Lean: Stripe Connect**, Accounts v2 for new integrations (GA for Direct users is on Stripe's Q4 2026 roadmap). Keep our own balance ledger, reconciled against webhooks. |
+| O17 | **Sales-led B2B billing** | Invoices, net terms, purchase orders, quotes, tax IDs | Polar covers self-serve. Options: Stripe Billing + Stripe Tax (we become the seller of record), or Stripe Managed Payments once its Invoicing ships (private preview Q4 2026, GA Q1 2027 per Stripe's roadmap). Decide when the first deal needs it. Entitlements (P12) keep the choice swappable. |
+| O18 | **API product kit** | Keys, limits, outbound webhooks, docs, SDKs | Keys: our own hashed table vs Unkey (free 150K verifications/month). Limits: Cloudflare rate-limiting binding (GA; per location, eventually consistent) for bursts, usage ledger for quotas. Webhooks: Queues + Standard Webhooks format vs Svix. Docs: Scalar (MIT renderer; hosted docs paid) vs Mintlify. SDKs: Stainless closed new sign-ups after joining Anthropic (2026-05); Speakeasy open-sourced its generator (AGPLv3, 2026-09; check the licence of generated code); Fern is now Postman; Hey API (MIT, TypeScript, pre-1.0); Cloudflare Forge (Apache-2.0, early). **Lean:** own keys, Scalar, Hey API for TypeScript; decide other languages when a customer asks. |
+| O19 | **Abuse, fraud and moderation** (B2C, marketplace, user content) | Bot defence, sign-up fraud, SMS pumping, moderation pipeline, KYC, EU platform duties | Turnstile is free and unlimited (checked 2026-10-15). OpenAI moderation (free) as a first pass, with P10 work queues for human decisions. KYC through the payments processor; Stripe Identity $1.50 per verification. Marketplaces in the EU carry Digital Services Act duties (notice and action, trader traceability). |
+| O20 | **Residency and dedicated tenancy** (B2B enterprise, B2B2C) | When and how to offer an EU region, a dedicated database or a dedicated deployment | Routing by `orgId`; Neon project per region or per org; Durable Object jurisdiction. Verify Hyperdrive and Durable Object jurisdiction behaviour before promising it to a customer. |
+| O21 | **Search** (marketplace, content-heavy apps) | When Postgres full-text search stops being enough, and what replaces it | Neon removed `pg_search` on 2026-09-21; its `lakebase_text` (BM25) is in preview. Next step: Meilisearch (MIT; cloud from $20/month) or Typesense. The index is derived data, fed through the outbox (P4). |
 | O12 | One-time setup | Sentry + Better Stack accounts; Mac self-hosted runner (when mobile starts) | |
 
 ---
@@ -195,7 +249,7 @@ Three layers to pick: **runtime** (where the agent runs and keeps state), **mode
 - Decide with a FirstWord spike (agent proposes a screening rule while the user edits rules).
 
 ### O15. End-customer auth for B2B2C
-Need per-tenant user pools, phone/email OTP, passkeys, Sign in with Apple, tenant-branded screens, works with Expo native screens. WorkOS is strongest for tenant staff (orgs, SSO, SCIM) but is B2B-first; candidates for end customers: WorkOS AuthKit without organizations (flat pool, tenant scoping in our DB), Clerk, Better Auth (self-hosted, in our DB), Stytch. Decide on: per-tenant isolation of the same email, branding, cost at consumer scale, native mobile support.
+**Updated 2026-10-15 (P11 re-examination):** the default is now one platform identity with a per-org customer profile; isolated per-org pools only for white-label tiers. That makes WorkOS AuthKit without organizations (flat pool, free to 1M MAU, verified) the lead candidate, since it is already our provider; per-org pools would need another provider or extra WorkOS environments arranged through support. Original framing: need per-tenant user pools, phone/email OTP, passkeys, Sign in with Apple, tenant-branded screens, works with Expo native screens. WorkOS is strongest for tenant staff (orgs, SSO, SCIM) but is B2B-first; candidates for end customers: WorkOS AuthKit without organizations (flat pool, tenant scoping in our DB), Clerk, Better Auth (self-hosted, in our DB), Stytch. Decide on: per-tenant isolation of the same email, branding, cost at consumer scale, native mobile support.
 
 ## Verify — decided, not yet proven
 

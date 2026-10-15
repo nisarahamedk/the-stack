@@ -121,13 +121,14 @@ What we have converged on so far. Use these to judge any new proposal; if one of
 | [DECISIONS.md](DECISIONS.md) | Proposed (P*), Open (O*), Verify (V*) and Decided items, with status and dates |
 | [docs/coding-standards.md](docs/coding-standards.md) | Code rules, each tagged with how it is enforced |
 | [docs/errors.md](docs/errors.md) | Error design: messages, typed errors, boundaries, UI copy |
+| [docs/archetypes.md](docs/archetypes.md) | Per-archetype core, variants, actor model, day-one seams and moves between archetypes |
 
 Keep README the short, stable reference; put reasoning and history in DECISIONS; put rules a project copies into `docs/`.
 
 ## Where to pick up
 
-- **Missing and most needed:** an archetype guide (`docs/archetypes.md`) that maps each product type to the defaults, variants and decisions that apply to it. Several recent proposals (P9 agent-native, P10 admin, P11 B2B2C) should be re-examined against every archetype, not just the one they came from.
-- Open calls with the widest impact: O1 (Effect TS) → O13 (contract layer), O14 (in-app agent runtime), O15 (end-customer auth), plus approval of P1–P6, P8–P11.
+- **Awaiting approval:** the archetype guide ([docs/archetypes.md](docs/archetypes.md), P12) and the archetype re-examination amendments to P9–P11.
+- Open calls with the widest impact: O1 (Effect TS) → O13 (contract layer), O14 (in-app agent runtime), O15 (end-customer auth), O16 (third-party payments), plus approval of P1–P6, P8–P12.
 
 ## Git
 

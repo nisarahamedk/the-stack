@@ -6,7 +6,7 @@ Point an agent here with: *"Build <app>. Use this reference."*
 This file defines the default stack, how a project is set up, and how the dev → QA → prod loop works.
 Deviate only when the app genuinely needs it, and say why in the PR.
 
-Agents working on this repo: read [AGENTS.md](AGENTS.md) first. Open and proposed decisions live in [DECISIONS.md](DECISIONS.md). Code rules every project follows: [docs/coding-standards.md](docs/coding-standards.md) and [docs/errors.md](docs/errors.md).
+Agents working on this repo: read [AGENTS.md](AGENTS.md) first. Open and proposed decisions live in [DECISIONS.md](DECISIONS.md). Code rules every project follows: [docs/coding-standards.md](docs/coding-standards.md) and [docs/errors.md](docs/errors.md). What changes per product type: [docs/archetypes.md](docs/archetypes.md) (proposed).
 
 Last verified: 2026-10-12. Items marked **(unproven)** have not been exercised end to end yet.
 
