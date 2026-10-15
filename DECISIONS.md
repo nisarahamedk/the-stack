@@ -5,7 +5,7 @@ When something is decided, move it into the README and mark it **Decided** here 
 
 Statuses: **Decided** (in README) · **Proposed** (opinion formed, awaiting approval) · **Open** (needs research or a call) · **Verify** (decided, but not yet proven in a real project).
 
-Last updated: 2026-10-15 (P9, P10 added).
+Last updated: 2026-10-15 (P9, P10, P11, O15 added).
 
 ---
 
@@ -141,6 +141,28 @@ Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition 
 - **Built with our stack:** TanStack Start + shadcn + TanStack Table, shared admin components in the private registry (data table, entity page, audit timeline, operation dialog with reason/confirm, impersonation banner). Exists in every PR stage with seed data, so agents can test it.
 - **Open:** audit log store (Postgres table vs R2/Axiom); retention period.
 
+### P11. B2B2C: tenants with their own customers and mobile apps
+Three audiences, one contract, one action layer:
+
+| Tier | Who | Surface | Contract namespace |
+|---|---|---|---|
+| Platform | our staff + their agents | `apps/admin` + admin MCP (P10) | `platform.*` (internal) |
+| Tenant | the business's staff + their agents | tenant console inside the product web app; public API `/v1` + tenant MCP | `tenant.*` |
+| End customer | the business's customers | mobile app (Expo) and optional web | `customer.*` |
+
+- **Principals:** `platformStaff`, `tenantMember { tenantId, role }`, `endCustomer { tenantId, customerId }`, and `agent { onBehalfOf }` over any of them. `can()` checks the principal type first; every row carries `tenantId` (RLS backstop, P2), end-customer rows also carry `customerId`.
+- **Identity pools are separate:** tenant staff are org members (WorkOS organizations, SSO/SCIM for big tenants). End customers are a per-tenant user pool: the same email at two tenants is two unrelated accounts. The auth provider for end customers is open (O15).
+- **Tenant console is the product, not an admin afterthought:** same P10 rules (named operations, audit, preview/confirm), scoped to one tenant, agent-native (P9). Tenant admins see a log of platform support access to their data; platform staff reach tenant data only through time-limited support access with a reason.
+- **Tenant configuration is typed data:** branding tokens, enabled features and entitlements (by plan), store metadata, domains, notification senders, in one schema-validated `tenantConfig`. Apps read it at runtime; nothing tenant-specific is hard-coded.
+- **Mobile, two modes from one Expo codebase:**
+  - *Shared app (default):* one app in the stores; the customer picks or is linked to their tenant (invite link, code, QR); branding applied at runtime. Matches Apple's accepted "picker" model.
+  - *White-label (premium tier):* per-tenant binary generated from `tenantConfig` via `app.config.ts` + EAS build profiles; one EAS project per tenant (updates can't share a URL); published under **the tenant's own Apple/Google developer accounts** (App Store guideline 4.2.6 rejects template apps not submitted by the content provider). Per-tenant store credentials and push keys live in the vault, scoped per tenant. JS changes ship to all tenants via EAS Update; native changes trigger a build fan-out.
+- **Web for tenants' customers on their own domains:** Cloudflare for SaaS custom hostnames (100 free, then $0.10/month each).
+- **Per-tenant sending identity:** email from the tenant's verified domain (Resend domains), SMS/push credentials per tenant where white-labelled.
+- **Money flows are two different systems:** tenants pay us (subscription billing, README default); end customers paying tenants needs a marketplace/Connect-style processor with payouts, not a merchant of record. Digital goods sold inside the mobile app fall under store in-app purchase rules.
+- **Isolation tiers:** pooled (shared DB, `tenantId` + RLS) by default; per-tenant database or Durable Object namespace only for tenants who pay for it.
+- **Open:** O15 end-customer auth provider; marketplace payments provider; whether white-label is offered at all for a given product.
+
 ---
 
 ## Open — needs research or a call
@@ -171,6 +193,9 @@ Three layers to pick: **runtime** (where the agent runs and keeps state), **mode
 - UI: our shadcn components; assistant-ui (headless, shadcn-based) if chat UI grows. Generative UI specs (A2UI, MCP Apps) not needed in-app.
 - Lean: Cloudflare Agents SDK + AI SDK as baseline; re-check TanStack AI at 1.0. Our three-state rules (P9) and actions keep the wire swappable.
 - Decide with a FirstWord spike (agent proposes a screening rule while the user edits rules).
+
+### O15. End-customer auth for B2B2C
+Need per-tenant user pools, phone/email OTP, passkeys, Sign in with Apple, tenant-branded screens, works with Expo native screens. WorkOS is strongest for tenant staff (orgs, SSO, SCIM) but is B2B-first; candidates for end customers: WorkOS AuthKit without organizations (flat pool, tenant scoping in our DB), Clerk, Better Auth (self-hosted, in our DB), Stytch. Decide on: per-tenant isolation of the same email, branding, cost at consumer scale, native mobile support.
 
 ## Verify — decided, not yet proven
 
