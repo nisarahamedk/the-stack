@@ -145,7 +145,12 @@ Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition 
 ---
 
 ### O14. In-app agent runtime and UI wire
-Where our in-app agent runs and how it talks to the UI. Candidates: a Durable Object per agent session (Cloudflare Agents SDK, which syncs state to clients over WebSocket) speaking AG-UI events; CopilotKit runtime + AG-UI; Vercel AI SDK UI stream. Lean: Durable Object agent, AG-UI event shapes on the wire, no CopilotKit runtime by default. Decide with a FirstWord spike (agent proposes a screening rule while the user edits rules).
+Three layers to pick: **runtime** (where the agent runs and keeps state), **model + wire** (tool loop and the stream to the UI), **UI** (chat and approval components).
+- Runtime: **Cloudflare Agents SDK** (agent = Durable Object with SQLite; `setState` synced to clients over WebSocket; chat agent with client tools and human-in-the-loop approvals; scheduling). Fits P5 and our infra. Alternatives: Mastra, LangGraph (separate backend; only if we leave Workers).
+- Model + wire: **Vercel AI SDK v6** (most proven; `useChat`, client tools, tool approval; own stream format; Cloudflare's chat agent builds on it) vs **TanStack AI** (RC Aug 2026, not 1.0; AG-UI is its official protocol; same family as our web stack) vs **Effect AI** (`effect/unstable/ai`, no UI layer; only if O1 = Effect). CopilotKit (AG-UI originator, heaviest, hosted runtime) not by default.
+- UI: our shadcn components; assistant-ui (headless, shadcn-based) if chat UI grows. Generative UI specs (A2UI, MCP Apps) not needed in-app.
+- Lean: Cloudflare Agents SDK + AI SDK as baseline; re-check TanStack AI at 1.0. Our three-state rules (P9) and actions keep the wire swappable.
+- Decide with a FirstWord spike (agent proposes a screening rule while the user edits rules).
 
 ## Verify — decided, not yet proven
 
