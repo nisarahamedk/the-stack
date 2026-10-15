@@ -114,8 +114,13 @@ Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition 
 - **Shared, live state:** agent changes appear in the UI as they happen (Durable Object push, P5), not by polling; the UI shares a small typed view context (route, selection) so the agent understands "this".
 - **Visible, interruptible agent:** disclosed as an agent; status always shown (working / waiting for you / done / failed); stop takes effect immediately; a person always owns the outcome (Linear's Agent Interaction Guidelines).
 - **Untrusted content stays untrusted:** text an agent reads from users, callers, email or the web cannot widen what it may do; `external` actions need a person when the agent has read untrusted input in that session.
+- **Three kinds of shared state, each with one owner:**
+  - *Domain state* (calls, rules, records): server-owned (Postgres / Durable Objects). Changed only through actions, by people and agents alike; pushed live to the UI.
+  - *View state* (route, selection, open drafts): browser-owned. The UI sends the agent a typed view context; the agent changes it only through typed **UI tools** (`navigate`, `select`, `highlight`, `fillDraft`), never the DOM. The agent never overwrites a field the person is editing.
+  - *Run state* (plan, progress, streamed text, pending approvals): agent-owned, streamed to the UI.
+- **Where the protocols fit:** AG-UI is the wire between our in-app agent and our UI (run events, tool calls, interrupts, state snapshot/patch). It carries run and view state only, never a second copy of domain truth. WebMCP registers the same UI tools and actions for an agent already in the person's browser (origin trial from Chrome 149). MCP serves headless external agents; MCP Apps embeds our UI in Claude/ChatGPT. All four call the same actions.
 - **Watch, don't build yet:** MCP Apps (render our UI inside Claude/ChatGPT; final spec, supported by both) when a project wants it; WebMCP (flag-gated in Chrome, no mainstream agent calls it yet); A2A.
-- **Open:** how the MCP server is generated from the contract (oRPC vs Effect, O13); where risk level lives in the contract; proposal storage shape.
+- **Open:** O14 (agent runtime and UI wire); how the MCP server is generated from the contract (oRPC vs Effect, O13); where risk level lives in the contract; proposal storage shape.
 
 ---
 
@@ -138,6 +143,9 @@ Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition 
 | O12 | One-time setup | Sentry + Better Stack accounts; Mac self-hosted runner (when mobile starts) | |
 
 ---
+
+### O14. In-app agent runtime and UI wire
+Where our in-app agent runs and how it talks to the UI. Candidates: a Durable Object per agent session (Cloudflare Agents SDK, which syncs state to clients over WebSocket) speaking AG-UI events; CopilotKit runtime + AG-UI; Vercel AI SDK UI stream. Lean: Durable Object agent, AG-UI event shapes on the wire, no CopilotKit runtime by default. Decide with a FirstWord spike (agent proposes a screening rule while the user edits rules).
 
 ## Verify — decided, not yet proven
 
