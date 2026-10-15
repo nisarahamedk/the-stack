@@ -183,6 +183,7 @@ Three audiences, one contract, one action layer:
 - **Re-examined against every archetype (2026-10-15). Proposed amendments:**
   - *Holds:* three audiences, one action layer; the tenant console is the product; typed tenant configuration; two mobile modes; custom domains; per-tenant sending identity.
   - **The tenant is the org.** Use one `orgId` column everywhere (not `tenantId`), so a B2B product that grows into B2B2C needs no migration. End-customer rows add `customerId`.
+    This challenges the "`tenantId` from day one" example in AGENTS.md (Taste). If approved, that line should read "`orgId` on every row from day one".
   - **Namespaces:** the primary audience lives at the contract root, and only secondary audiences get a prefix (`admin.*`, `customer.*`). A `tenant.*` prefix would force renaming every B2B procedure when the product grows into B2B2C.
   - **End-customer identity, default flipped.** The default becomes one platform identity with a per-org customer profile. That fits the shared app (the default mobile mode): a person who uses two orgs signs in once, and each org sees only its own profile. Per-org isolated pools are reserved for white-label tiers that need them. Checked 2026-10-15: WorkOS AuthKit supports a flat, org-less pool (free to 1M MAU) but has no self-serve per-tenant pools, so the old default was also the expensive one. O15 updated.
   - **Configuration and entitlements are separate.** `orgConfig` holds what the org chose (branding, domains, senders). Entitlements hold what it paid for, and billing writes them. P11 had them together.
@@ -207,6 +208,7 @@ Three audiences, one contract, one action layer:
   - B2C users get a personal org.
   - Marketplace transactions are scoped by party (`buyerOrgId`, `sellerOrgId`).
   - `orgId` comes from the verified session: for personal orgs it is derived on the server from the user, not carried in the token. Our `org` table is the tenancy source of truth; a WorkOS organization is linked only when SSO or managed membership is needed.
+- **Challenges AGENTS.md invariant 2 (one actor model):** its principal list should add API keys and system actors (webhooks, schedules, consumers), and agents should be split into delegated and service agents (P9 amendment). Tenant member and end customer become scopes of a `user` rather than separate principal kinds. If approved, update the invariant.
 - **Why:** each seam costs a table, a type or a field on day one. Retrofitting one means migrating every table or every handler, and moving between archetypes is the common path (B2C → B2B, B2B → API, any → agent-native).
 - **Alternatives considered:** per-archetype starter templates (they drift apart and double maintenance); laying seams only when needed (cheap until the move, then the most expensive migrations there are).
 - **Revisit if:** a seam goes unused across the first three products, or its day-one cost turns out to matter (e.g. personal orgs at consumer scale).
