@@ -5,7 +5,7 @@ When something is decided, move it into the README and mark it **Decided** here 
 
 Statuses: **Decided** (in README) · **Proposed** (opinion formed, awaiting approval) · **Open** (needs research or a call) · **Verify** (decided, but not yet proven in a real project).
 
-Last updated: 2026-10-14 (P7, P8, O13 added).
+Last updated: 2026-10-15 (P9 added).
 
 ---
 
@@ -103,6 +103,19 @@ The README promises these; nothing enforces them yet. Proposed defaults per proj
 - **Scale by design:** stateless Workers; per-entity Durable Objects (no global singletons); DB indexes reviewed with query plans for every new query on a hot path; pagination everywhere (cursor-based).
 - **Extensibility:** additive contract changes (§3.2), capabilities behind interfaces (coding-standards §9), feature flags for risky rollouts (P6).
 - **Open:** exact default numbers; which load-testing tool runs from GitHub Actions against PR stages; whether SLO burn alerts go to the on-call setup.
+
+### P9. Agent-native apps: people and agents work on the same product
+Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition serves the UI, agent tools, HTTP, CLI, MCP and A2A; shared data; the agent sees what is on screen. **Take the ideas, not the framework:** it brings its own auth, orgs, storage and sync, which overlap our WorkOS / oRPC / Postgres / Durable Object choices, and it is beta.
+- **One action layer:** every capability is a contract procedure (§3.2) that the UI, the agent, the public API and an MCP server all call. No screen-driving agents inside our own apps.
+- **Agents act on behalf of a person, never above them:** the actor is `{ user }` or `{ agent, onBehalfOf, sessionId }`; `can()` (P2) allows the user's permissions intersected with what that agent was granted. Every write records the actor, so the UI can show who changed what.
+- **Risk level on every action** in the contract: `read` / `reversible` / `irreversible` / `external` (sends money, messages or calls). The level decides whether the agent may run it directly, must propose it, or must ask first.
+- **Reversible beats approve:** prefer drafts, suggestions and undo over confirmation dialogs; agent writes on medium-risk actions land as proposals in the same state the person edits (suggestion mode). Approval prompts only for irreversible or external effects, with approve / reject / **edit** (Magentic-UI users asked for the third option).
+- **Show outcomes, not traces:** review shows what changed (a diff of the result); a trace of steps is for debugging. Studies found traces raise confidence without raising accuracy.
+- **Shared, live state:** agent changes appear in the UI as they happen (Durable Object push, P5), not by polling; the UI shares a small typed view context (route, selection) so the agent understands "this".
+- **Visible, interruptible agent:** disclosed as an agent; status always shown (working / waiting for you / done / failed); stop takes effect immediately; a person always owns the outcome (Linear's Agent Interaction Guidelines).
+- **Untrusted content stays untrusted:** text an agent reads from users, callers, email or the web cannot widen what it may do; `external` actions need a person when the agent has read untrusted input in that session.
+- **Watch, don't build yet:** MCP Apps (render our UI inside Claude/ChatGPT; final spec, supported by both) when a project wants it; WebMCP (flag-gated in Chrome, no mainstream agent calls it yet); A2A.
+- **Open:** how the MCP server is generated from the contract (oRPC vs Effect, O13); where risk level lives in the contract; proposal storage shape.
 
 ---
 
