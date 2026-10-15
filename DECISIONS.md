@@ -128,12 +128,18 @@ Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition 
 - **Staff roles, least privilege:** e.g. `support_read`, `support`, `billing`, `engineer`, `owner`. Personal data masked by default; revealing it is an audited action.
 - **One actor model for staff, agents and users:** `{ staff, onBehalfOf?, reason }`, same shape as P9. "View as user" is read-only by default; acting as a user is time-limited, needs a reason, shows a banner, is recorded with both identities, and never covers payouts, credentials or deletion. No "log in as user".
 - **Every admin write is audited:** who, on behalf of whom, what changed (before/after), reason, request ID. Append-only, kept longer than app logs.
-- **Operations, not raw edits:** each admin action is a named operation (`refundPayment`, `extendTrial`, `resetNumber`) with a preview of what will change, idempotency key, typed confirmation for irreversible ones, and bulk operations as queued jobs with progress.
-- **Customer 360 is the main screen:** one page per org/user with a timeline of everything (account, billing, usage, calls, errors, support), linking out by ID to traces (P3), Sentry, PostHog, Polar, WorkOS. Don't rebuild what those dashboards already do.
-- **Agent-first ops:** admin operations are also exposed as an internal MCP server, so a staff member can run support through an agent with the same roles (read-only by default, writes need approval, P9 rules). The admin UI shrinks to review, approval and the views an agent can't replace. Personal data sent to a model follows the model provider's data terms.
+- **Operations, not raw edits:** each admin action is a named operation (`refundPayment`, `extendTrial`, `transferOwnership`) with a preview of what will change, idempotency key, typed confirmation for irreversible ones, and bulk operations as queued jobs with progress.
+- **Customer 360 is the main screen:** one page per org/user with a timeline of everything (account, billing, usage, key domain events, errors, support), linking out by ID to traces (P3), Sentry, PostHog, Polar, WorkOS. Don't rebuild what those dashboards already do.
+- **Agent-first ops — Decided 2026-10-15:** every app ships an admin MCP server from day one, so AI agents can work on the platform on behalf of staff.
+  - Tools are generated from the admin contract (same operations as the admin UI); no tool exists that the UI's operations don't.
+  - Sign-in through the staff identity provider (OAuth), behind Cloudflare Access. The actor is `{ agent, onBehalfOf: staff, sessionId }`; permissions are the staff member's role intersected with the scopes granted to that agent session.
+  - **The server enforces approval, not the client:** `read` tools run directly; `reversible` writes run and are undoable; `irreversible` and `external` writes create a pending operation that a person approves (or edits) in the admin UI.
+  - Personal data is masked in tool results by default; revealing it is a separate, audited tool. Customer-supplied text in results is untrusted and cannot widen what the session may do.
+  - Per-session limits on bulk size and rate; one switch disables all agent access.
+  - Every tool call is audited with the session ID. The server exists in every PR stage with seed data.
 - **Reads that can't hurt prod:** admin queries use a read-only DB role (or replica) with timeouts; ad-hoc SQL only through that role, logged. Analytics belongs in PostHog or a warehouse, not admin.
 - **Built with our stack:** TanStack Start + shadcn + TanStack Table, shared admin components in the private registry (data table, entity page, audit timeline, operation dialog with reason/confirm, impersonation banner). Exists in every PR stage with seed data, so agents can test it.
-- **Open:** whether the admin MCP server is MVP or later; audit log store (Postgres table vs R2/Axiom); retention period.
+- **Open:** audit log store (Postgres table vs R2/Axiom); retention period.
 
 ---
 
