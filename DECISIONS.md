@@ -5,7 +5,7 @@ When something is decided, move it into the README and mark it **Decided** here 
 
 Statuses: **Decided** (in README) · **Proposed** (opinion formed, awaiting approval) · **Open** (needs research or a call) · **Verify** (decided, but not yet proven in a real project).
 
-Last updated: 2026-10-15 (P9–P11 re-examined against every archetype; P12 and O16–O21 added).
+Last updated: 2026-10-18 (P13 decided; dev account plan recorded).
 
 ---
 
@@ -212,6 +212,13 @@ Three audiences, one contract, one action layer:
 - **Why:** each seam costs a table, a type or a field on day one. Retrofitting one means migrating every table or every handler, and moving between archetypes is the common path (B2C → B2B, B2B → API, any → agent-native).
 - **Alternatives considered:** per-archetype starter templates (they drift apart and double maintenance); laying seams only when needed (cheap until the move, then the most expensive migrations there are).
 - **Revisit if:** a seam goes unused across the first three products, or its day-one cost turns out to matter (e.g. personal orgs at consumer scale).
+
+### P13. Fake every dependency that isn't under test — **Decided 2026-10-18**
+- **Rule:** a test uses the real external dependency only when that dependency is the component under test. Everything else gets a faithful fake that crosses the same interface (coding-standards §9). For LLMs, use the AI SDK's mock language models; model behaviour itself is tested by evals (Evalite), not by end-to-end tests.
+- **Evidence:** FirstWord, 2026-10: CI, agent testing and preview end-to-end runs drove a Cloudflare agent with a live model in real time. That pushed the dev account to the Durable Objects Free limit (100k rows written/day). Moving tests that don't exercise model behaviour to AI SDK mocks fixed it.
+- **Dev account plan:** stays on Workers Free and is upgraded only when limits bite again. The Free limit acts as a hard cap (Principle 5); the cost is that requests fail once it's hit. The prod account's plan is a separate subscription and should be checked on its own.
+- **Proposed, not yet decided:** a label-gated and nightly lane that runs real-provider tests, so drift in a vendor's behaviour still gets caught.
+- **Revisit if:** fakes drift from the real provider and hide a production bug.
 
 ---
 

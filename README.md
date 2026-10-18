@@ -149,7 +149,7 @@ Every app starts as landing page + web app; mobile, partners, CLIs and agents co
 Climb only as far as the change needs.
 
 1. **Local (seconds):** typecheck, lint, unit tests, app running locally, provider emulators (WorkOS emulator, Mailpit), replayed signed webhooks, Expo web build in headless Chromium.
-2. **PR environment (push → ~1–3 min):** CI deploys `pr-<n>` and runs Playwright against it with real providers and real webhooks; the agent reads the results from the PR.
+2. **PR environment (push → ~1–3 min):** CI deploys `pr-<n>` and runs Playwright against it, with faithful fakes for every external dependency that isn't the component under test (e.g. AI SDK mock models instead of a live LLM) and real webhooks where the test needs them; the agent reads the results from the PR. Real-provider and model-behaviour checks are separate lanes (§7, DECISIONS P13).
 3. **Special lanes (CI jobs on the PR):** real-time media, devices, Maestro mobile flows — see §7.
 4. **Ready for review:** the agent marks the PR ready when everything is green; the human can open the preview URL.
 5. **Prod (on merge):** run migrations (must be backward compatible — never drop/rename in the same deploy), deploy, run post-deploy smoke test, roll back automatically on failure.
@@ -161,6 +161,7 @@ Climb only as far as the change needs.
 | Outbound API calls | HTTPS out | Anywhere, including the agent's cloud container |
 | Webhooks / callbacks | A public URL | A deployed stage (no tunnels — they don't work from cloud agent containers) |
 | Identity, email, payments | No human | Emulators / test modes: WorkOS emulator, Mailpit or Resend receiving, Polar sandbox (card 4242…) |
+| Model behaviour | Real model calls | Evals (Evalite) on prompt/model changes; everything else uses mock models (P13) |
 | Real-time media (WebRTC voice/video) | UDP + fake mic/camera | GitHub-hosted runner; Chromium fake-media flags or a server-SDK bot publishing a pre-recorded `.wav`/`.y4m` **(unproven)** |
 | Your own media server (needs inbound UDP) | Open UDP | Fly Machines / Hetzner |
 | iOS | macOS | Self-hosted runner on the Mac **(unproven)**, or EAS Workflows |
