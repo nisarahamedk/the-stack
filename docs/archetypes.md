@@ -2,7 +2,7 @@
 
 What the-stack looks like for each kind of product: what every product shares, what each archetype adds, and the seams that let a product move from one archetype to another without a rewrite.
 
-**Status: Proposed (DECISIONS P12).** Decisions referenced here keep their own status in [DECISIONS.md](../DECISIONS.md); this guide only maps them to archetypes. Last updated: 2026-10-15.
+**Status: mostly decided (DECISIONS P12, 2026-10-18).** Decisions referenced here keep their own status in [DECISIONS.md](../DECISIONS.md); this guide only maps them to archetypes. Last updated: 2026-10-18.
 
 ## 1. How to use this guide
 
@@ -24,7 +24,7 @@ Don't build an archetype's variants before the product is that archetype. SSO, w
 | Risk | Every action has a risk tier (`read` / `reversible` / `irreversible` / `external`); reversible beats approval prompts; the server enforces approval for agents on the risky tiers | P9 |
 | Actor | One actor model for users, staff, agents, API keys and system jobs (§3) | P9–P11 |
 | Authorization | One `can()` in `core`; tenancy comes from the verified session, never from input | P2 |
-| Tenancy | `orgId` on every tenant-owned row, in every archetype; B2C users get a personal org | P2, §6 |
+| Tenancy | `orgId` on every tenant-owned row; B2C users get a personal org (the PRD may opt out for products whose data is single-owner forever) | P2, P12, §6 |
 | Types and errors | Parse at the boundary; typed errors with a literal `code` | coding-standards, errors |
 | Async | Idempotent webhooks, queues, workflows and outbox | P4 |
 | State | Every piece of state has one owner: Postgres for shared truth, Durable Objects for per-entity live state, the browser for view state, the agent for run state. Other copies (search index, cache, offline replica) are derived and can be rebuilt | P5, P9 |
@@ -124,6 +124,17 @@ Businesses run their own customer relationships on our product.
 
 - **Identity:** org members as in B2B. End customers: **default one platform identity with a per-org customer profile**, so one person using two orgs in the shared app signs in once and each org sees only its own profile. Isolated per-org pools only for white-label tiers that need them (O15). WorkOS AuthKit supports a flat, org-less user pool (free to 1M MAU), which fits this default; it has no self-serve per-tenant pools (checked 2026-10-15).
 - **Tenancy:** the tenant *is* the org, so one `orgId` column everywhere; end-customer rows add `customerId`.
+- **Data model:**
+
+```
+user(id, workos_user_id, email)              -- every human with a login
+org(id, kind: personal|business, …)          -- the business is an org
+membership(user_id, org_id, role)            -- the business's staff
+customer(id, org_id, user_id NULL, name, …)  -- the business's own record of a customer; exists even without an app login
+booking(id, org_id, customer_id, …)          -- domain rows carry org_id (+ customer_id where it applies)
+```
+
+  A customer joining through an invite link or QR code links `customer.user_id`. One person at two businesses is one `user` and two `customer` rows; each business filters by its own `orgId`. In the customer app the actor's scope is `{ customer: c1 in org A }`, and the server checks that `c1.user_id` is the signed-in user. Contract: business staff actions at the root, end-customer actions under `customer.*`, our staff under `admin.*`. Multi-location businesses are one org with a `location` table, not orgs inside orgs.
 - **Money:** orgs pay us (subscription); end customers pay orgs through a third-party payments processor with payouts (O16); digital goods sold inside a mobile app follow store rules.
 - **Surfaces:** tenant console (the B2B org console, grown up), customer app (shared or white-label Expo build), customer web on the org's own domain (Cloudflare for SaaS), public API and webhooks for orgs that integrate.
 - **Trust:** no path from one org to another org's customers; staff access through support grants that orgs can see; per-org sending identities so one org can't damage another's email deliverability.
@@ -223,16 +234,16 @@ The phone app is the product; web is secondary or marketing.
 
 ### 6.1 Seams to lay on day one
 
-Seams are plumbing around whatever domain model the PRD defines, not a generic domain model; the domain model stays product-specific and minimal. Seven seams go into every product. Three wait for a product **trait** (not an archetype label) and go in the day that trait appears.
+Seams are plumbing around whatever domain model the PRD defines, not a generic domain model; the domain model stays product-specific and minimal. Six seams go into every product. Four wait for a product **trait** (not an archetype label) and go in the day that trait appears; org ownership is on by default.
 
 | Seam | Lay it | Day-one cost | Unlocks | Retrofit cost without it |
 |---|---|---|---|---|
-| `orgId` on every tenant-owned row; personal org in B2C and internal tools | Always | One table, one column | B2C → B2B, internal → B2B, B2B → B2B2C | Backfill every table, rewrite every query |
+| `orgId` on every tenant-owned row; personal org in B2C and internal tools | When data might ever be owned or paid for by more than one person: on by default, the PRD may opt out | One table, one column | B2C → B2B, internal → B2B, B2B → B2B2C | Backfill every table, rewrite every query |
 | One actor model (§3) | Always | One type, built per request | Agents, staff, API keys, system jobs, support access | A special case in every handler for each new caller |
-| Action metadata in the contract: audience, risk tier, exposure (RPC / OpenAPI / MCP), idempotency | Always | A few fields per procedure | Public API, MCP, admin, agent approvals generated instead of hand-built | Re-classify every procedure later |
+| Action metadata in the contract: audience, risk tier, exposure (RPC / OpenAPI / MCP). Idempotency is mandatory for every write (P4), not a tag | Always | A few fields per procedure | Public API, MCP, admin, agent approvals generated instead of hand-built | Re-classify every procedure later |
 | Entitlements read by product code; providers write them | When anything is paid or plan-gated | One table, one webhook path | Web + in-app purchase + invoices + marketplace; plan changes without code | Provider checks scattered through the code |
 | Usage ledger | When anything costs per use (AI calls, metered API, usage pricing) | One append-only table | AI budgets, API quotas, usage billing | No history to bill or cap from |
-| Audit stream for every write | Always | One table, written by `core` | Customer audit log, admin timeline, agent review | History lost before the day it's needed |
+| Audit event per state-changing action, written by the action wrapper in `core` (not per table; skip high-volume derived writes and plumbing) | Always | One table, written by `core` | Customer audit log, admin timeline, agent review | History lost before the day it's needed |
 | Our own `user` and `org` tables in Postgres (the provider keeps authentication; its IDs are stored as plain columns) | Always | Two tables | Swap the identity provider; add a second identity pool | Provider IDs as primary keys everywhere |
 | Typed `orgConfig` (separate from entitlements) | When orgs configure anything | One schema | White-label, enterprise settings, per-org features | Org-specific branches in code |
 | Durable Objects keyed by domain ID behind a client | Always (when Durable Objects are used) | The coding-standards §8 shape | Realtime, agents, per-entity scheduling | Global singletons that hot-spot |

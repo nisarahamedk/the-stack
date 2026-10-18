@@ -41,7 +41,7 @@ Last verified: 2026-10-12. Items marked **(unproven)** have not been exercised e
 | Background work | Cloudflare Queues, Cron Triggers, Workflows, Durable Object alarms | |
 | File storage | Cloudflare R2, presigned uploads | R2 has no versioning — back up what matters |
 | Auth | WorkOS AuthKit | Web: hosted pages + Widgets. Mobile: custom native screens via your API (headless). Consumer-only mobile apps may use Clerk's native components instead |
-| Payments | Polar (merchant of record) on web | Mobile: link US users to web checkout; RevenueCat for in-app subscriptions elsewhere |
+| Payments | Polar (merchant of record) on web | Mobile: link US users to web checkout; RevenueCat for in-app subscriptions elsewhere. Polar fees for orgs created from 2026-05-27: 5% + 50¢ on the free plan, 3.8% + 40¢ on Pro ($20/month); re-check before pricing. Product code reads our own entitlements table, never the provider (DECISIONS P15) |
 | Email | Resend | |
 | AI models | OpenRouter, behind Cloudflare AI Gateway | Direct providers for realtime voice (OpenAI Realtime / Gemini Live), streaming STT/TTS (Deepgram, ElevenLabs, Cartesia), broad image/video (fal.ai) |
 | AI evals | Evalite (in CI) + Langfuse (tracing) | |

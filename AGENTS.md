@@ -48,6 +48,7 @@ The invariants every product keeps are the core in [docs/archetypes.md](docs/arc
 
 - **Separate the layers before picking tools.** Runtime vs wire vs UI; protocol vs framework; identity vs authorization; transport vs state. Most bad choices come from treating several layers as one.
 - **Take the ideas, not the framework**, when a framework wants to own our core (auth, data, actions, sync). A reference stack can't have its foundations owned by a beta product.
+- **Buy the plumbing, own the record and the decision.** Vendors process (sign-in, payments, invoicing, inboxes); our database holds the system-of-record copy and our code decides who may do what. A vendor's IDs are links, never keys. Applied in DECISIONS P15.
 - **Protocols over products, but watch before building.** Adopt open standards (MCP, OpenAPI, AG-UI shapes); don't build for a standard no client calls yet.
 - **Extension points over premature features.** Design so B2C → B2B → B2B2C, single-region → multi-region, pooled → isolated tenants are additive changes (the seams in [docs/archetypes.md](docs/archetypes.md) §6).
 - **Pin and checkpoint anything beta.** Name the revisit trigger (e.g. "re-check at 1.0").

@@ -5,7 +5,7 @@ When something is decided, move it into the README and mark it **Decided** here 
 
 Statuses: **Decided** (in README) · **Proposed** (opinion formed, awaiting approval) · **Open** (needs research or a call) · **Verify** (decided, but not yet proven in a real project).
 
-Last updated: 2026-10-18 (P13 decided; O7, O10 output, P12 kickoff step and web release strategy decided; P14 added; AGENTS.md de-duplicated).
+Last updated: 2026-10-18 (most of P9–P12 decided; P15 build-vs-buy decided; P13, P14, O7, O10 output decided).
 
 ---
 
@@ -121,12 +121,12 @@ Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition 
 - **Where the protocols fit:** AG-UI is the wire between our in-app agent and our UI (run events, tool calls, interrupts, state snapshot/patch). It carries run and view state only, never a second copy of domain truth. WebMCP registers the same UI tools and actions for an agent already in the person's browser (origin trial from Chrome 149). MCP serves headless external agents; MCP Apps embeds our UI in Claude/ChatGPT. All four call the same actions.
 - **Watch, don't build yet:** MCP Apps (render our UI inside Claude/ChatGPT; final spec, supported by both) when a project wants it; WebMCP (flag-gated in Chrome, no mainstream agent calls it yet); A2A.
 - **Open:** O14 (agent runtime and UI wire); how the MCP server is generated from the contract (oRPC vs Effect, O13); where risk level lives in the contract; proposal storage shape.
-- **Re-examined against every archetype (2026-10-15). Proposed amendments** ([docs/archetypes.md](docs/archetypes.md) §3, §7):
+- **Re-examined against every archetype (2026-10-15). Amendments** ([docs/archetypes.md](docs/archetypes.md) §3, §7). **Decided 2026-10-18:** shared `Actor` with delegated and service agents; org agent policy (enforced in our own `can()`, see P15); approvals as server-side pending operations (Cloudflare Workflows wait + a Postgres row, P15); risk tier in procedure metadata; per-run budgets. Still proposed: the MCP spec target.
   - *Holds everywhere:* one action layer, risk tiers, reversible beats approve, outcomes over traces, untrusted content, three kinds of state.
   - **One shared `Actor`** (archetypes §3) for P9, P10 and P11. It adds `apiKey` and `system` principals. It also splits agents into **delegated** (a person's assistant) and **service** (works for the principal while talking to someone else: an org's support bot answering its customers, a voice agent taking calls for a user, a seller's agent). P9 only described delegated agents; service agents appear in B2B2C, marketplace and AI products.
   - **Org agent policy (B2B, B2B2C):** org admins can turn agents off, limit tools or risk tiers, and set data retention. `can()` intersects it with the person's permissions and the session grant. Enterprise buyers ask for this before anything else.
   - **Approvals are server-side pending operations**, the same object as P10's. They are shown over AG-UI and push, and can be approved from any device. Mobile and multi-device use need this, and it answers "proposal storage shape".
-  - **Risk level lives in procedure metadata** (with audience, exposure and idempotency; P12). That answers "where risk level lives".
+  - **Risk level lives in procedure metadata** (with audience and exposure; P12). That answers "where risk level lives".
   - **Budgets:** every agent run has a per-actor and per-org budget, enforced on the server from the usage ledger (P12). B2C free tiers and usage-priced API products break without it.
   - **External agents:** target MCP 2026-07-28. It is stateless; OAuth uses Client ID Metadata Documents, and dynamic client registration is deprecated. In B2B, the Enterprise-Managed Authorization extension lets the org's identity provider decide which agents connect. Risk tiers map to OAuth scopes.
   - *Variants:* B2C → per-user budgets; B2B → org policy; B2B2C → service agents serving end customers; marketplace → agents buying or selling for people (always `external`, always approval; agentic-commerce protocols are a watch item, not yet researched); realtime → the agent has presence like a collaborator; API product → MCP + OAuth is a first-class surface; mobile → push approvals.
@@ -149,7 +149,7 @@ Prompted by Builder.io's Agent-Native (beta, 2026-10-14): one action definition 
 - **Reads that can't hurt prod:** admin queries use a read-only DB role (or replica) with timeouts; ad-hoc SQL only through that role, logged. Analytics belongs in PostHog or a warehouse, not admin.
 - **Built with our stack:** TanStack Start + shadcn + TanStack Table, shared admin components in the private registry (data table, entity page, audit timeline, operation dialog with reason/confirm, impersonation banner). Exists in every PR stage with seed data, so agents can test it.
 - **Open:** audit log store (Postgres table vs R2/Axiom); retention period.
-- **Re-examined against every archetype (2026-10-15). Proposed amendments:**
+- **Re-examined against every archetype (2026-10-15). Amendments.** **Decided 2026-10-18:** customers see support access (built in-house, P15); work queues (a small `case` table first, P15); audit store = one append-only Postgres table written per action. Still proposed: the `admin.*` name, scope-agnostic admin components, internal tool = P10.
   - *Holds everywhere:* admin as a client of the actions, named operations, every write audited, admin MCP with server-enforced approval (the Decided part is unchanged; target MCP 2026-07-28, see P9).
   - **One namespace name:** `admin.*` in every archetype (P11's `platform.*` becomes `admin.*`).
   - **Customers can see support access.** This rule moves from P11 into P10 because B2B needs it as much as B2B2C: org admins see a log of staff access to their org, and an org can require its approval first. In B2C, access is recorded but not shown.
@@ -180,7 +180,7 @@ Three audiences, one contract, one action layer:
 - **Money flows are two different systems:** tenants pay us (subscription billing, README default); end customers paying tenants needs a marketplace/Connect-style processor with payouts, not a merchant of record. Digital goods sold inside the mobile app fall under store in-app purchase rules.
 - **Isolation tiers:** pooled (shared DB, `tenantId` + RLS) by default; per-tenant database or Durable Object namespace only for tenants who pay for it.
 - **Open:** O15 end-customer auth provider; marketplace payments provider; whether white-label is offered at all for a given product.
-- **Re-examined against every archetype (2026-10-15). Proposed amendments:**
+- **Re-examined against every archetype (2026-10-15). Amendments.** **Decided 2026-10-18:** the tenant is the org (`orgId`); namespaces (primary audience at the root, `customer.*` and `admin.*` prefixed); end customers get one platform login with a per-org `customer` profile (data model in archetypes §5.3); org API keys and service agents. Still proposed: the `orgConfig`/entitlements split, corrected isolation tiers, payments moved to O16. The user may revisit B2B2C later.
   - *Holds:* three audiences, one action layer; the tenant console is the product; typed tenant configuration; two mobile modes; custom domains; per-tenant sending identity.
   - **The tenant is the org.** Use one `orgId` column everywhere (not `tenantId`), so a B2B product that grows into B2B2C needs no migration. End-customer rows add `customerId`.
     (The conflicting "`tenantId` from day one" example in AGENTS.md was removed on 2026-10-18; AGENTS.md now links to the seams instead.)
@@ -194,10 +194,15 @@ Three audiences, one contract, one action layer:
 ### P12. Archetype guide and day-one seams
 - **Decided 2026-10-18 (kickoff step):** every project names its archetypes during the PRD kickoff and records them in its own `AGENTS.md` (see O10).
 - **Proposed:** [docs/archetypes.md](docs/archetypes.md) becomes the kickoff guide. Each project names its archetypes, builds the core, adds only the variants for the archetypes it is today, lays the seams, and records all of this in its `AGENTS.md`.
-- **Day-one seams** (archetypes §6.1). Revised 2026-10-18 after the user asked whether these depend on archetype: they are plumbing around the product's own domain model, not a generic domain model. Seven are laid always; entitlements, the usage ledger and `orgConfig` wait for a product trait (paid or gated, costs per use, orgs configure things). The full list:
+- **Day-one seams** (archetypes §6.1). Revised 2026-10-18 after the user asked whether these depend on archetype: they are plumbing around the product's own domain model, not a generic domain model.
+  - **Decided 2026-10-18:**
+    - Always: the actor model; each action declares audience, risk tier and exposure (idempotency is mandatory for every write under P4, so it isn't a per-action tag); an audit event per state-changing action, written by the action wrapper in `core` (not per table; high-volume derived writes and plumbing are excluded); our own `user`/`org` tables.
+    - When the trait appears: `orgId` ownership with personal orgs (trait: data might ever be owned or paid for by more than one person; on by default, the PRD can opt out for single-owner products); entitlements (anything paid or plan-gated); usage ledger (anything costs per use).
+  - **Still proposed:** typed `orgConfig` (when orgs configure anything).
+  - The original list, for reference:
   - `orgId` on every tenant-owned row, with personal orgs in B2C and internal tools;
   - the shared `Actor`;
-  - action metadata in the contract (audience, risk tier, exposure, idempotency) as oRPC procedure metadata;
+  - action metadata in the contract (audience, risk tier, exposure) as oRPC procedure metadata;
   - entitlements that product code reads and only billing providers write;
   - an append-only usage ledger;
   - an audit stream for every write;
@@ -225,6 +230,22 @@ Three audiences, one contract, one action layer:
 - **Decided 2026-10-18 (web apps and APIs):** trunk-based. `main` deploys to prod continuously, and feature flags (P6) decide when users see a feature. Rollback is instant and deploys are cheap, so a release branch would only add merge drift.
 - **Proposed (binaries: mobile, desktop, SDKs, self-hosted):** a release branch cut from `main` per version (a release train), with hotfixes cherry-picked in. For mobile, JavaScript-only fixes go out through EAS Update on the release's runtime version.
 - **Either way:** the branch that deploys prod is protected with required review (O7).
+
+### P15. Build or buy: vendors handle the plumbing, we own the record and the decision — **Decided 2026-10-18**
+Rule (also in AGENTS.md, Taste): vendors handle the plumbing (sign-in, payments, invoicing, inboxes). Our database holds the system-of-record copy, and our code makes authorization decisions. A vendor's IDs are links, never keys. Research checked 2026-10-18.
+
+| Need | Buy | Own (thin) | Revisit if |
+|---|---|---|---|
+| Entitlements | Polar and RevenueCat process payments | `entitlements` table filled by their webhooks plus a periodic re-sync; our ID passed as Polar's external customer ID and RevenueCat's app user ID | Web billing moves to Stripe (then Autumn or Stigg). No vendor combines Polar and RevenueCat; Stripe's entitlements need Stripe billing |
+| Usage ledger | Polar meters for invoicing (sent in the background) | Atomic counter for enforcement (Postgres; a Durable Object per customer on the hot path) | Polar meters lag and Polar leaves enforcement to us; Stripe meters also lag |
+| Agent sign-in (MCP) | WorkOS AuthKit as the MCP sign-in server; enterprise identity-provider control of agents on request | — | Watch auth.md (WorkOS's open protocol for agents signing users up) |
+| Agent permissions | — | `can()` = person ∩ session grant ∩ per-org agent/tool policy table | Enterprise wants Cedar policies: Keycard (org policy is Enterprise-only and covers the operator's own staff, not our customers' orgs) |
+| Durable approvals | Cloudflare Workflows `waitForEvent` (up to 365 days; Agents SDK `waitForApproval`) | `pending_operation` row read by the UI, push and audit; one executor runs every agent action | — |
+| Audit | WorkOS Audit Logs only for an enterprise viewer or SIEM streaming ($125/month per stream + $99 per 1M events; charge for it) | Append-only Postgres table, the source of truth | — |
+| Support access visibility | — | Support grants, the `support` part of the actor, audit events the org can see | No vendor sells this. WorkOS impersonation logs staff in as the user, which P10 rules out |
+| Support inbox | Plain when volume is real ($45/user/month, official MCP) | Email + customer history in admin until then | — |
+| Moderation queue | Detection: OpenAI moderation or Hive. Queue: ROOST Coop (open source, Docker, so it needs the container option) at real volume or when child-safety reporting applies | Small `case` table in admin until then | — |
+| Payment disputes | Stripe Smart Disputes once Connect is in use | — | — |
 
 ---
 
@@ -282,4 +303,4 @@ Three layers to pick: **runtime** (where the agent runs and keeps state), **mode
 
 ## Decided (see README)
 
-Infisical `dev-vault` + host-native prod secrets · two Cloudflare accounts · Alchemy v2 PR stages · GitHub Actions prod deploys · TanStack Start with server gate (`ssr: 'data-only'`) · react-doctor + React Compiler + hooks lint · TanStack Query + Form · oRPC contract-first API (`contract` / `core` / clients) · organizations from day one · Tailwind + shadcn · idempotency mandatory · fakes for every dependency not under test (P13) · trunk-based releases for web/API (P14) · GitHub Pro + protected prod branch (O7) · kickoff output (O10) · one home per fact (AGENTS.md).
+Infisical `dev-vault` + host-native prod secrets · two Cloudflare accounts · Alchemy v2 PR stages · GitHub Actions prod deploys · TanStack Start with server gate (`ssr: 'data-only'`) · react-doctor + React Compiler + hooks lint · TanStack Query + Form · oRPC contract-first API (`contract` / `core` / clients) · organizations from day one · Tailwind + shadcn · idempotency mandatory · fakes for every dependency not under test (P13) · trunk-based releases for web/API (P14) · GitHub Pro + protected prod branch (O7) · kickoff output (O10) · one home per fact (AGENTS.md) · own `user`/`org` tables, actor model, action metadata, per-action audit, trait-triggered seams (P12) · B2B2C core (P11) · agent amendments (P9) · build or buy (P15).
