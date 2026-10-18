@@ -201,7 +201,7 @@ Three audiences, one contract, one action layer:
   - entitlements that product code reads and only billing providers write;
   - an append-only usage ledger;
   - an audit stream for every write;
-  - our own `user`/`org` tables, with identity provider IDs as foreign links;
+  - our own `user`/`org` tables, with identity provider IDs as foreign links. **Decided 2026-10-18.** The provider keeps authentication (credentials, sessions, MFA, SSO/SCIM). Our Postgres tables are the record that every domain table references; provider IDs are nullable unique columns; rows are created on first sign-in and kept in sync through provider webhooks via the P4 inbox. A WorkOS organization is linked only when an org needs SSO or managed membership;
   - typed `orgConfig`;
   - Durable Objects behind a client;
   - an additive `/v1` contract.

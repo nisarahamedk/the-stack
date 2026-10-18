@@ -233,7 +233,7 @@ Seams are plumbing around whatever domain model the PRD defines, not a generic d
 | Entitlements read by product code; providers write them | When anything is paid or plan-gated | One table, one webhook path | Web + in-app purchase + invoices + marketplace; plan changes without code | Provider checks scattered through the code |
 | Usage ledger | When anything costs per use (AI calls, metered API, usage pricing) | One append-only table | AI budgets, API quotas, usage billing | No history to bill or cap from |
 | Audit stream for every write | Always | One table, written by `core` | Customer audit log, admin timeline, agent review | History lost before the day it's needed |
-| Our own `user` and `org` tables; identity provider IDs are foreign links | Always | Two tables | Swap the identity provider; add a second identity pool | Provider IDs as primary keys everywhere |
+| Our own `user` and `org` tables in Postgres (the provider keeps authentication; its IDs are stored as plain columns) | Always | Two tables | Swap the identity provider; add a second identity pool | Provider IDs as primary keys everywhere |
 | Typed `orgConfig` (separate from entitlements) | When orgs configure anything | One schema | White-label, enterprise settings, per-org features | Org-specific branches in code |
 | Durable Objects keyed by domain ID behind a client | Always (when Durable Objects are used) | The coding-standards §8 shape | Realtime, agents, per-entity scheduling | Global singletons that hot-spot |
 | Additive contract, `/v1` from day one | Always | Discipline + CI check | Mobile, public API, partners | Breaking shipped clients |
