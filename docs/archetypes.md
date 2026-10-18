@@ -6,33 +6,35 @@ What the-stack looks like for each kind of product: what every product shares, w
 
 ## 1. How to use this guide
 
-At kickoff, the agent:
+Kickoff is a PRD session with the user (DECISIONS O10). In it, the agent:
 
 1. **Names the archetypes.** One primary, plus any secondary ones (most products are two or three: "B2B SaaS + AI/agent-native, API later").
 2. **Builds the core (§2)** whatever the archetype.
 3. **Adds the variants** for each named archetype (§5).
 4. **Lays the seams (§6)** for any archetype the product may grow into. They are cheap on day one and expensive to retrofit.
-5. **Records all of it** in the project's `AGENTS.md`: archetypes, variants chosen, seams in place, deviations and why.
+5. **Records all of it** in the project's `AGENTS.md` (alongside its README and `docs/prd/*`): archetypes, variants chosen, seams in place, deviations and why.
 
 Don't build an archetype's variants before the product is that archetype. SSO, white-label builds, split payments, offline sync and CRDT documents arrive with the move, not before. The seams are what make the move cheap.
 
-## 2. The core: same for every archetype
+## 2. The core: invariants for every archetype
 
 | Concern | Rule | Source |
 |---|---|---|
-| Actions | Every capability is one contract procedure; UI, mobile, public API, MCP, admin and agents all call it | README §3.2, P9 |
+| Actions | Every capability is one contract procedure; UI, mobile, public API, MCP, admin and agents all call it. No side doors: no admin tool with database credentials, no agent clicking through our own UI | README §3.2, P9 |
+| Risk | Every action has a risk tier (`read` / `reversible` / `irreversible` / `external`); reversible beats approval prompts; the server enforces approval for agents on the risky tiers | P9 |
 | Actor | One actor model for users, staff, agents, API keys and system jobs (§3) | P9–P11 |
 | Authorization | One `can()` in `core`; tenancy comes from the verified session, never from input | P2 |
 | Tenancy | `orgId` on every tenant-owned row, in every archetype; B2C users get a personal org | P2, §6 |
 | Types and errors | Parse at the boundary; typed errors with a literal `code` | coding-standards, errors |
 | Async | Idempotent webhooks, queues, workflows and outbox | P4 |
-| State | Postgres owns shared truth; Durable Objects own per-entity live state | P5 |
-| Money | Product code reads **entitlements**; billing providers only write them | §6 |
-| Usage | Metered events go to one append-only **usage ledger** | §6 |
-| Audit | Every write by any actor emits an audit event | P10, §6 |
+| State | Every piece of state has one owner: Postgres for shared truth, Durable Objects for per-entity live state, the browser for view state, the agent for run state. Other copies (search index, cache, offline replica) are derived and can be rebuilt | P5, P9 |
+| Money | Once anything is paid or plan-gated: product code reads **entitlements**; billing providers only write them | §6 |
+| Usage | Once anything costs per use: metered events go to one append-only **usage ledger** | §6 |
+| Audit | Every write records its actor and emits an audit event | P10, §6 |
 | Operations | Admin app + admin MCP from day one | P10 (Decided) |
 | Quality | Traces end to end, SLOs, performance budgets, product analytics | P3, P6, P8 |
-| Delivery | IaC, a stage per PR, vault for dev secrets, host-native prod secrets | README §4–§6 |
+| Delivery | IaC, a stage per PR, vault for dev secrets, host-native prod secrets; fakes for every dependency not under test | README §4–§6, P13 |
+| Observability | Traced from day one; the public `requestId` is the trace ID | P3 |
 
 ## 3. One actor model
 
@@ -221,18 +223,20 @@ The phone app is the product; web is secondary or marketing.
 
 ### 6.1 Seams to lay on day one
 
-| Seam | Day-one cost | Unlocks | Retrofit cost without it |
-|---|---|---|---|
-| `orgId` on every tenant-owned row; personal org in B2C and internal tools | One table, one column | B2C → B2B, internal → B2B, B2B → B2B2C | Backfill every table, rewrite every query |
-| One actor model (§3) | One type, built per request | Agents, staff, API keys, system jobs, support access | A special case in every handler for each new caller |
-| Action metadata in the contract: audience, risk tier, exposure (RPC / OpenAPI / MCP), idempotency | A few fields per procedure | Public API, MCP, admin, agent approvals generated instead of hand-built | Re-classify every procedure later |
-| Entitlements read by product code; providers write them | One table, one webhook path | Web + in-app purchase + invoices + marketplace; plan changes without code | Provider checks scattered through the code |
-| Usage ledger | One append-only table | AI budgets, API quotas, usage billing | No history to bill or cap from |
-| Audit stream for every write | One table, written by `core` | Customer audit log, admin timeline, agent review | History lost before the day it's needed |
-| Our own `user` and `org` tables; identity provider IDs are foreign links | Two tables | Swap the identity provider; add a second identity pool | Provider IDs as primary keys everywhere |
-| Typed `orgConfig` (separate from entitlements) | One schema | White-label, enterprise settings, per-org features | Org-specific branches in code |
-| Durable Objects keyed by domain ID behind a client | The coding-standards §8 shape | Realtime, agents, per-entity scheduling | Global singletons that hot-spot |
-| Additive contract, `/v1` from day one | Discipline + CI check | Mobile, public API, partners | Breaking shipped clients |
+Seams are plumbing around whatever domain model the PRD defines, not a generic domain model; the domain model stays product-specific and minimal. Seven seams go into every product. Three wait for a product **trait** (not an archetype label) and go in the day that trait appears.
+
+| Seam | Lay it | Day-one cost | Unlocks | Retrofit cost without it |
+|---|---|---|---|---|
+| `orgId` on every tenant-owned row; personal org in B2C and internal tools | Always | One table, one column | B2C → B2B, internal → B2B, B2B → B2B2C | Backfill every table, rewrite every query |
+| One actor model (§3) | Always | One type, built per request | Agents, staff, API keys, system jobs, support access | A special case in every handler for each new caller |
+| Action metadata in the contract: audience, risk tier, exposure (RPC / OpenAPI / MCP), idempotency | Always | A few fields per procedure | Public API, MCP, admin, agent approvals generated instead of hand-built | Re-classify every procedure later |
+| Entitlements read by product code; providers write them | When anything is paid or plan-gated | One table, one webhook path | Web + in-app purchase + invoices + marketplace; plan changes without code | Provider checks scattered through the code |
+| Usage ledger | When anything costs per use (AI calls, metered API, usage pricing) | One append-only table | AI budgets, API quotas, usage billing | No history to bill or cap from |
+| Audit stream for every write | Always | One table, written by `core` | Customer audit log, admin timeline, agent review | History lost before the day it's needed |
+| Our own `user` and `org` tables; identity provider IDs are foreign links | Always | Two tables | Swap the identity provider; add a second identity pool | Provider IDs as primary keys everywhere |
+| Typed `orgConfig` (separate from entitlements) | When orgs configure anything | One schema | White-label, enterprise settings, per-org features | Org-specific branches in code |
+| Durable Objects keyed by domain ID behind a client | Always (when Durable Objects are used) | The coding-standards §8 shape | Realtime, agents, per-entity scheduling | Global singletons that hot-spot |
+| Additive contract, `/v1` from day one | Always | Discipline + CI check | Mobile, public API, partners | Breaking shipped clients |
 
 ### 6.2 Moves between archetypes
 

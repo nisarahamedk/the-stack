@@ -152,7 +152,7 @@ Climb only as far as the change needs.
 2. **PR environment (push → ~1–3 min):** CI deploys `pr-<n>` and runs Playwright against it, with faithful fakes for every external dependency that isn't the component under test (e.g. AI SDK mock models instead of a live LLM) and real webhooks where the test needs them; the agent reads the results from the PR. Real-provider and model-behaviour checks are separate lanes (§7, DECISIONS P13).
 3. **Special lanes (CI jobs on the PR):** real-time media, devices, Maestro mobile flows — see §7.
 4. **Ready for review:** the agent marks the PR ready when everything is green; the human can open the preview URL.
-5. **Prod (on merge):** run migrations (must be backward compatible — never drop/rename in the same deploy), deploy, run post-deploy smoke test, roll back automatically on failure.
+5. **Prod (on merge):** run migrations (must be backward compatible — never drop/rename in the same deploy), deploy, run post-deploy smoke test, roll back automatically on failure. Web apps and APIs are trunk-based: `main` deploys continuously and feature flags (DECISIONS P6) decide when users see a feature. Release branches are only for products that ship binaries (DECISIONS P14).
 
 ## 7. Test lanes — where each kind of test runs
 
@@ -198,7 +198,7 @@ Before integrating a provider, answer and record in the project's `AGENTS.md`:
 
 ## 11. Starting a new app — checklist for the agent
 
-1. Create the monorepo from §3; add `AGENTS.md` linking here.
+1. Kick off with the human: write the PRD (`docs/prd/*`) and name the archetypes ([docs/archetypes.md](docs/archetypes.md)). Then create the monorepo from §3 with a README and an `AGENTS.md` that records archetypes, variants and seams and links here, so agents can start with no open questions.
 2. Write `alchemy.run.ts` with stages per §5; pin the Alchemy version.
 3. List needed secrets in `secrets.json`; ask the human to add any missing vault values (never paste them in chat).
 4. Add providers per §8.

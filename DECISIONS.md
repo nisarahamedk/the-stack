@@ -5,7 +5,7 @@ When something is decided, move it into the README and mark it **Decided** here 
 
 Statuses: **Decided** (in README) · **Proposed** (opinion formed, awaiting approval) · **Open** (needs research or a call) · **Verify** (decided, but not yet proven in a real project).
 
-Last updated: 2026-10-18 (P13 decided; dev account plan recorded).
+Last updated: 2026-10-18 (P13 decided; O7, O10 output, P12 kickoff step and web release strategy decided; P14 added; AGENTS.md de-duplicated).
 
 ---
 
@@ -183,7 +183,7 @@ Three audiences, one contract, one action layer:
 - **Re-examined against every archetype (2026-10-15). Proposed amendments:**
   - *Holds:* three audiences, one action layer; the tenant console is the product; typed tenant configuration; two mobile modes; custom domains; per-tenant sending identity.
   - **The tenant is the org.** Use one `orgId` column everywhere (not `tenantId`), so a B2B product that grows into B2B2C needs no migration. End-customer rows add `customerId`.
-    This challenges the "`tenantId` from day one" example in AGENTS.md (Taste). If approved, that line should read "`orgId` on every row from day one".
+    (The conflicting "`tenantId` from day one" example in AGENTS.md was removed on 2026-10-18; AGENTS.md now links to the seams instead.)
   - **Namespaces:** the primary audience lives at the contract root, and only secondary audiences get a prefix (`admin.*`, `customer.*`). A `tenant.*` prefix would force renaming every B2B procedure when the product grows into B2B2C.
   - **End-customer identity, default flipped.** The default becomes one platform identity with a per-org customer profile. That fits the shared app (the default mobile mode): a person who uses two orgs signs in once, and each org sees only its own profile. Per-org isolated pools are reserved for white-label tiers that need them. Checked 2026-10-15: WorkOS AuthKit supports a flat, org-less pool (free to 1M MAU) but has no self-serve per-tenant pools, so the old default was also the expensive one. O15 updated.
   - **Configuration and entitlements are separate.** `orgConfig` holds what the org chose (branding, domains, senders). Entitlements hold what it paid for, and billing writes them. P11 had them together.
@@ -192,8 +192,9 @@ Three audiences, one contract, one action layer:
   - **Third-party payments** move out to O16, shared with marketplaces.
 
 ### P12. Archetype guide and day-one seams
+- **Decided 2026-10-18 (kickoff step):** every project names its archetypes during the PRD kickoff and records them in its own `AGENTS.md` (see O10).
 - **Proposed:** [docs/archetypes.md](docs/archetypes.md) becomes the kickoff guide. Each project names its archetypes, builds the core, adds only the variants for the archetypes it is today, lays the seams, and records all of this in its `AGENTS.md`.
-- **Day-one seams in every product** (archetypes §6.1):
+- **Day-one seams** (archetypes §6.1). Revised 2026-10-18 after the user asked whether these depend on archetype: they are plumbing around the product's own domain model, not a generic domain model. Seven are laid always; entitlements, the usage ledger and `orgConfig` wait for a product trait (paid or gated, costs per use, orgs configure things). The full list:
   - `orgId` on every tenant-owned row, with personal orgs in B2C and internal tools;
   - the shared `Actor`;
   - action metadata in the contract (audience, risk tier, exposure, idempotency) as oRPC procedure metadata;
@@ -208,7 +209,7 @@ Three audiences, one contract, one action layer:
   - B2C users get a personal org.
   - Marketplace transactions are scoped by party (`buyerOrgId`, `sellerOrgId`).
   - `orgId` comes from the verified session: for personal orgs it is derived on the server from the user, not carried in the token. Our `org` table is the tenancy source of truth; a WorkOS organization is linked only when SSO or managed membership is needed.
-- **Challenges AGENTS.md invariant 2 (one actor model):** its principal list should add API keys and system actors (webhooks, schedules, consumers), and agents should be split into delegated and service agents (P9 amendment). Tenant member and end customer become scopes of a `user` rather than separate principal kinds. If approved, update the invariant.
+- **AGENTS.md invariants (resolved 2026-10-18):** the user ruled that AGENTS.md doesn't restate decisions documented elsewhere. Its invariants list was removed; the invariants now live once, as the core in archetypes §2, with the actor model in §3 (still Proposed).
 - **Why:** each seam costs a table, a type or a field on day one. Retrofitting one means migrating every table or every handler, and moving between archetypes is the common path (B2C → B2B, B2B → API, any → agent-native).
 - **Alternatives considered:** per-archetype starter templates (they drift apart and double maintenance); laying seams only when needed (cheap until the move, then the most expensive migrations there are).
 - **Revisit if:** a seam goes unused across the first three products, or its day-one cost turns out to matter (e.g. personal orgs at consumer scale).
@@ -219,6 +220,11 @@ Three audiences, one contract, one action layer:
 - **Dev account plan:** stays on Workers Free and is upgraded only when limits bite again. The Free limit acts as a hard cap (Principle 5); the cost is that requests fail once it's hit. The prod account's plan is a separate subscription and should be checked on its own.
 - **Proposed, not yet decided:** a label-gated and nightly lane that runs real-provider tests, so drift in a vendor's behaviour still gets caught.
 - **Revisit if:** fakes drift from the real provider and hide a production bug.
+
+### P14. Release strategy depends on how the product ships
+- **Decided 2026-10-18 (web apps and APIs):** trunk-based. `main` deploys to prod continuously, and feature flags (P6) decide when users see a feature. Rollback is instant and deploys are cheap, so a release branch would only add merge drift.
+- **Proposed (binaries: mobile, desktop, SDKs, self-hosted):** a release branch cut from `main` per version (a release train), with hotfixes cherry-picked in. For mobile, JavaScript-only fixes go out through EAS Update on the release's runtime version.
+- **Either way:** the branch that deploys prod is protected with required review (O7).
 
 ---
 
@@ -232,10 +238,10 @@ Three audiences, one contract, one action layer:
 | O4 | Per-resource sharing | WorkOS FGA vs OpenFGA | Only when an app needs it; confirm WorkOS FGA pricing. |
 | O5 | AI layer details | Prompt versioning, evals as CI gate, per-user cost caps, model fallbacks, personal data in prompts/logs | Not yet discussed in depth. |
 | O6 | Agent operating model | Definition of done for agent PRs, merge policy, orchestrator/worker/stack-session handoffs, agent spend per project | |
-| O7 | Protect `main` | GitHub Pro for required PR review on private repos | Main safeguard before prod deploys. |
+| O7 | Protect `main` | **Decided 2026-10-18:** GitHub Pro; required PR review on whichever branch deploys prod | Human action: subscribe to GitHub Pro and set the branch rule on each repo. A release branch doesn't remove the need: whatever deploys prod must be protected. |
 | O8 | Clerk vs WorkOS for FirstWord; Clerk Platform API | Migrate FirstWord auth? Request Platform API access? Separate dev Clerk account? | |
 | O9 | FirstWord data | Stay on D1 or move to Neon (RLS, branching) | D1 has no RLS; relevant once orgs/B2B matter. |
-| O10 | Project kickoff | Template repo + kickoff prompts (stack session → project orchestrator → workers) | Deferred. |
+| O10 | Project kickoff | **Output decided 2026-10-18:** kickoff is a PRD session with the user that reads the-stack and ends with a repo holding all config, a README, `docs/prd/*` and an `AGENTS.md` (archetypes, variants, seams), so agents start with no ambiguity. Still open: template repo and kickoff prompts | |
 | O11 | Keeping the-stack current | Quarterly re-verify routine that opens a PR | Deferred. |
 | O13 | **Contract layer if Effect wins** | oRPC vs Effect HttpApi | Effect HttpApi also gives a typed contract + OpenAPI + typed client. If O1 lands on "adopt", decide whether oRPC stays. **Recommendation: hold FirstWord's oRPC migration until O1 is decided**, to avoid migrating twice. |
 | O16 | **Third-party payments** (marketplace, B2B2C) | Processor, charge model, who carries disputes, KYC flow, seller tax reporting | Checked 2026-10-15: no merchant of record allows marketplaces (Polar, Paddle and Lemon Squeezy prohibit them; Stripe Managed Payments excludes Connect). **Lean: Stripe Connect**, Accounts v2 for new integrations (GA for Direct users is on Stripe's Q4 2026 roadmap). Keep our own balance ledger, reconciled against webhooks. |
@@ -276,4 +282,4 @@ Three layers to pick: **runtime** (where the agent runs and keeps state), **mode
 
 ## Decided (see README)
 
-Infisical `dev-vault` + host-native prod secrets · two Cloudflare accounts · Alchemy v2 PR stages · GitHub Actions prod deploys · TanStack Start with server gate (`ssr: 'data-only'`) · react-doctor + React Compiler + hooks lint · TanStack Query + Form · oRPC contract-first API (`contract` / `core` / clients) · organizations from day one · Tailwind + shadcn · idempotency mandatory.
+Infisical `dev-vault` + host-native prod secrets · two Cloudflare accounts · Alchemy v2 PR stages · GitHub Actions prod deploys · TanStack Start with server gate (`ssr: 'data-only'`) · react-doctor + React Compiler + hooks lint · TanStack Query + Form · oRPC contract-first API (`contract` / `core` / clients) · organizations from day one · Tailwind + shadcn · idempotency mandatory · fakes for every dependency not under test (P13) · trunk-based releases for web/API (P14) · GitHub Pro + protected prod branch (O7) · kickoff output (O10) · one home per fact (AGENTS.md).
